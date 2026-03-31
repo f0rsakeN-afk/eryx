@@ -26,7 +26,7 @@ function OAuthButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex flex-1 h-11 items-center justify-center rounded-full border border-border bg-background transition-colors duration-150 hover:bg-muted cursor-pointer"
+      className="flex flex-1 h-11 w-11 items-center justify-center rounded-full border border-border bg-background transition-colors duration-150 hover:bg-muted cursor-pointer"
     >
       {icon}
     </button>
@@ -63,17 +63,19 @@ export function LoginForm() {
   return (
     <div className="flex flex-col gap-3">
       {/* OAuth */}
-      <div className="flex gap-3">
-        <OAuthButton
-          icon={<GoogleIcon className="w-5 h-5" />}
-          label="Continue with Google"
-          onClick={() => {}}
-        />
-        <OAuthButton
-          icon={<GitHubIcon className="w-5 h-5 text-foreground" />}
-          label="Continue with GitHub"
-          onClick={() => {}}
-        />
+      <div className="w-full flex justify-center">
+        <div className="flex items-center gap-3">
+          <OAuthButton
+            icon={<GoogleIcon className="w-5 h-5" />}
+            label="Continue with Google"
+            onClick={() => {}}
+          />
+          <OAuthButton
+            icon={<GitHubIcon className="w-5 h-5 text-foreground" />}
+            label="Continue with GitHub"
+            onClick={() => {}}
+          />
+        </div>
       </div>
 
       {/* Divider */}
