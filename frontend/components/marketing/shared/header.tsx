@@ -18,10 +18,10 @@ import { ThemeToggle } from "@/components/shared/ThemeToggler";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const NAV_LINKS = [
-  { label: "Pricing",   href: "/pricing" },
+  { label: "Pricing", href: "/pricing" },
   { label: "Changelog", href: "/changelog" },
-  { label: "Status",    href: "/status" },
-  { label: "Contact",   href: "/contact" },
+  { label: "Status", href: "/status" },
+  { label: "Contact", href: "/contact" },
 ] as const;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -54,7 +54,9 @@ function NavLink({
       href={href}
       onClick={onClick}
       className={`relative text-sm transition-colors duration-200 group ${
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        active
+          ? "text-foreground"
+          : "text-muted-foreground hover:text-foreground"
       }`}
     >
       {label}
@@ -79,7 +81,6 @@ export function MarketingHeader() {
   return (
     <header className="border-b border-border sticky top-0 z-50 bg-background/90 backdrop-blur-md">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-6">
-
         <Logo />
 
         {/* Desktop nav */}
@@ -97,10 +98,10 @@ export function MarketingHeader() {
         {/* Desktop right actions */}
         <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="ghost">
             <Link href="/login">Sign in</Link>
           </Button>
-          <Button size="sm" asChild>
+          <Button>
             <Link href="/signup">Get started</Link>
           </Button>
         </div>
@@ -150,17 +151,20 @@ export function MarketingHeader() {
 
               {/* Mobile CTA */}
               <div className="flex flex-col gap-2 px-5 py-4">
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href="/login" onClick={closeSheet}>Sign in</Link>
+                <Button variant="outline" className="w-full">
+                  <Link href="/login" onClick={closeSheet}>
+                    Sign in
+                  </Link>
                 </Button>
-                <Button className="w-full" asChild>
-                  <Link href="/signup" onClick={closeSheet}>Get started</Link>
+                <Button className="w-full">
+                  <Link href="/signup" onClick={closeSheet}>
+                    Get started
+                  </Link>
                 </Button>
               </div>
             </SheetContent>
           </Sheet>
         </div>
-
       </div>
     </header>
   );

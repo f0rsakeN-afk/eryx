@@ -17,7 +17,7 @@ export default function SignupPage() {
 
       {/* Right — auth panel */}
       <div className="flex min-h-dvh flex-col items-center justify-center bg-card px-8 py-14 lg:border-l lg:border-border">
-        <div className="w-full max-w-[360px] flex flex-col gap-8">
+        <div className="w-full max-w-[400px] flex flex-col gap-8">
           {/* Logo (mobile only) */}
           <Link
             href="/"
