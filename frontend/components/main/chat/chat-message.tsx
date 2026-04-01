@@ -15,7 +15,6 @@ export interface Message {
   isStreaming?: boolean; // true while SSE chunks are arriving
 }
 
-
 // ---------------------------------------------------------------------------
 // UserMessage — with copy + inline edit
 // ---------------------------------------------------------------------------
@@ -124,7 +123,7 @@ const UserMessage = memo(function UserMessage({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
+    <div className="flex flex-col items-end gap-1.5 px-2 sm:px-0">
       <div className="max-w-[75%] rounded-2xl rounded-tr-sm bg-primary px-4 py-2.5 text-[14px] leading-relaxed text-primary-foreground shadow-xs">
         {content}
       </div>
@@ -166,7 +165,7 @@ const AssistantMessage = memo(function AssistantMessage({
   isStreaming?: boolean;
 }) {
   return (
-    <div className="group/assistant-msg min-w-0">
+    <div className="group/assistant-msg min-w-0 sm:max-w-[97%]">
       <AiResponseFormatter content={content} isStreaming={isStreaming} />
       {!isStreaming && <MessageActions content={content} />}
     </div>
