@@ -50,7 +50,7 @@ export const EmailBox = memo(function EmailBox({
   };
 
   return (
-    <div className="group my-6 overflow-hidden rounded-2xl border border-border bg-card shadow-xs transition-all focus-within:border-foreground/15 focus-within:shadow-md">
+    <div className="group my-6 overflow-hidden rounded-xl border border-border bg-card shadow-xs transition-all focus-within:border-foreground/15 focus-within:shadow-md">
       <div className="flex items-center justify-between border-b border-border/50 bg-muted/40 px-4 py-2">
         <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
           {label}
@@ -82,7 +82,7 @@ export const EmailBox = memo(function EmailBox({
       <div className="relative grid min-h-[160px] w-full bg-transparent">
         <div
           aria-hidden="true"
-          className="pointer-events-none col-start-1 row-start-1 h-full w-full whitespace-pre-wrap break-words px-6 py-6 text-[14px] font-normal leading-[1.7] text-transparent select-none"
+          className="pointer-events-none col-start-1 row-start-1 h-full w-full whitespace-pre-wrap wrap-break-word px-6 py-6 text-[14px] font-normal leading-[1.7] text-transparent select-none"
         >
           {renderHighlightedContent()}
         </div>

@@ -89,8 +89,8 @@ export default function ChatPage() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
       {/* ── Scrollable messages ────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto h-64">
-        <div className="mx-auto w-full max-w-3xl px-4 md:px-0 py-2">
+      <div className="flex-1 overflow-y-auto hide-scrollbar h-64">
+        <div className="mx-auto w-full max-w-3xl sm:px-4 md:px-0 py-2">
           {messages.map((message) => (
             <ChatMessage
               key={message.id}
@@ -104,7 +104,7 @@ export default function ChatPage() {
 
       {/* ── Sticky input ───────────────────────────────────── */}
       <div className="shrink-0">
-        <div className="mx-auto w-full max-w-3xl px-4 md:px-0 py-2">
+        <div className="mx-auto w-full max-w-3xl px-2 md:px-0 py-2">
           <ChatInput
             value={input}
             onChange={setInput}

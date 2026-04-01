@@ -51,6 +51,60 @@ const ChartVisualizer = dynamic(
     })),
   { ssr: false },
 );
+const TimelineVisualizer = dynamic(
+  () =>
+    import("./format/timeline").then((m) => ({
+      default: m.TimelineVisualizer,
+    })),
+  { ssr: false },
+);
+const ComparisonVisualizer = dynamic(
+  () =>
+    import("./format/comparison").then((m) => ({
+      default: m.ComparisonVisualizer,
+    })),
+  { ssr: false },
+);
+const TerminalBlock = dynamic(
+  () => import("./format/terminal").then((m) => ({ default: m.TerminalBlock })),
+  { ssr: false },
+);
+const MetricBoard = dynamic(
+  () => import("./format/metric").then((m) => ({ default: m.MetricBoard })),
+  { ssr: false },
+);
+const KanbanBoard = dynamic(
+  () => import("./format/kanban").then((m) => ({ default: m.KanbanBoard })),
+  { ssr: false },
+);
+const MermaidDiagram = dynamic(
+  () => import("./format/mermaid").then((m) => ({ default: m.MermaidDiagram })),
+  { ssr: false },
+);
+const FlashcardDeck = dynamic(
+  () =>
+    import("./format/flashcard").then((m) => ({ default: m.FlashcardDeck })),
+  { ssr: false },
+);
+const PollVisualizer = dynamic(
+  () => import("./format/poll").then((m) => ({ default: m.PollVisualizer })),
+  { ssr: false },
+);
+const FileTreeVisualizer = dynamic(
+  () =>
+    import("./format/file-tree").then((m) => ({
+      default: m.FileTreeVisualizer,
+    })),
+  { ssr: false },
+);
+const PersonaCard = dynamic(
+  () => import("./format/persona").then((m) => ({ default: m.PersonaCard })),
+  { ssr: false },
+);
+const DiffViewer = dynamic(
+  () => import("./format/diff-viewer").then((m) => ({ default: m.DiffViewer })),
+  { ssr: false },
+);
 
 // ---------------------------------------------------------------------------
 // YouTube helper — extracts video ID from watch / short / embed URLs
@@ -595,7 +649,7 @@ const mdComponents: Components = {
     if (language) {
       if (language === "email") {
         return (
-          <div className="px-4">
+          <div className="sm:px-4">
             <EmailBox initialContent={String(children).replace(/\n$/, "")} />
           </div>
         );
@@ -605,12 +659,38 @@ const mdComponents: Components = {
         const titleMatch = raw.match(/^#\s+(.+)$/m);
         return <DocumentVisualizer content={raw} title={titleMatch?.[1]} />;
       }
-      if (language === "chart") {
+      if (language === "chart")
         return <ChartVisualizer data={String(children).replace(/\n$/, "")} />;
-      }
-      if (language === "map") {
+      if (language === "map")
         return <MapVisualizer location={String(children).replace(/\n$/, "")} />;
-      }
+      if (language === "timeline")
+        return (
+          <TimelineVisualizer data={String(children).replace(/\n$/, "")} />
+        );
+      if (language === "comparison")
+        return (
+          <ComparisonVisualizer data={String(children).replace(/\n$/, "")} />
+        );
+      if (language === "terminal")
+        return <TerminalBlock output={String(children).replace(/\n$/, "")} />;
+      if (language === "metric")
+        return <MetricBoard data={String(children).replace(/\n$/, "")} />;
+      if (language === "kanban")
+        return <KanbanBoard data={String(children).replace(/\n$/, "")} />;
+      if (language === "mermaid")
+        return <MermaidDiagram code={String(children).replace(/\n$/, "")} />;
+      if (language === "flashcard")
+        return <FlashcardDeck data={String(children).replace(/\n$/, "")} />;
+      if (language === "poll")
+        return <PollVisualizer data={String(children).replace(/\n$/, "")} />;
+      if (language === "file-tree")
+        return (
+          <FileTreeVisualizer data={String(children).replace(/\n$/, "")} />
+        );
+      if (language === "persona")
+        return <PersonaCard data={String(children).replace(/\n$/, "")} />;
+      if (language === "diff")
+        return <DiffViewer code={String(children).replace(/\n$/, "")} />;
       return (
         <CodeBlock language={language}>
           {String(children).replace(/\n$/, "")}
@@ -730,7 +810,7 @@ export const AiResponseFormatter = memo(function AiResponseFormatter({
 
   return (
     <MediaContext.Provider value={ctxValue}>
-      <div className={cn("min-w-0 px-4", className)}>
+      <div className={cn("min-w-0 px-2 text-justify", className)}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
