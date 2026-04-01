@@ -138,7 +138,7 @@ export const ChartVisualizer = memo(function ChartVisualizer({ data }: { data: s
                 axisLine={false}
               />
               <RechartsTooltip
-                cursor={{ fill: "hsl(var(--muted) / 0.3)", radius: 4 }}
+                cursor={{ fill: "rgba(128,128,128,0.08)" }}
                 contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "12px", border: "1px solid hsl(var(--border))" }}
                 itemStyle={{ color: "hsl(var(--foreground))" }}
               />

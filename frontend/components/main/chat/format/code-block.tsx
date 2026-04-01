@@ -52,20 +52,23 @@ export const CodeBlock = memo(function CodeBlock({ language, children }: CodeBlo
         </span>
         <CodeCopyButton code={children} />
       </div>
-      <SyntaxHighlighter
-        language={language}
-        style={isDark ? vscDarkPlus : vs}
-        customStyle={{
-          margin: 0,
-          padding: "1rem",
-          backgroundColor: "transparent",
-          fontSize: "13px",
-          lineHeight: "1.65",
-        }}
-        codeTagProps={{ style: { fontFamily: "var(--font-mono, monospace)" } }}
-      >
-        {children}
-      </SyntaxHighlighter>
+      {/* Wrapper forces bg transparent via CSS !important — avoids React inline-style
+          conflict when switching between themes that use background vs backgroundColor */}
+      <div className="[&>pre]:!bg-transparent [&>pre]:!m-0">
+        <SyntaxHighlighter
+          language={language}
+          style={isDark ? vscDarkPlus : vs}
+          customStyle={{
+            margin: 0,
+            padding: "1rem",
+            fontSize: "13px",
+            lineHeight: "1.65",
+          }}
+          codeTagProps={{ style: { fontFamily: "var(--font-mono, monospace)" } }}
+        >
+          {children}
+        </SyntaxHighlighter>
+      </div>
     </div>
   );
 });
