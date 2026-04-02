@@ -105,6 +105,13 @@ const DiffViewer = dynamic(
   () => import("./format/diff-viewer").then((m) => ({ default: m.DiffViewer })),
   { ssr: false },
 );
+const SystemDesignDiagram = dynamic(
+  () =>
+    import("./format/system-design").then((m) => ({
+      default: m.SystemDesignDiagram,
+    })),
+  { ssr: false },
+);
 
 // ---------------------------------------------------------------------------
 // YouTube helper — extracts video ID from watch / short / embed URLs
@@ -643,7 +650,7 @@ const mdComponents: Components = {
 
   // Code — handles both inline and fenced blocks
   code: function Code({ className, children, ...props }) {
-    const match = /language-(\w+)/.exec(className ?? "");
+    const match = /language-([\w-]+)/.exec(className ?? "");
     const language = match?.[1];
 
     if (language) {
@@ -691,6 +698,10 @@ const mdComponents: Components = {
         return <PersonaCard data={String(children).replace(/\n$/, "")} />;
       if (language === "diff")
         return <DiffViewer code={String(children).replace(/\n$/, "")} />;
+      if (language === "system-design")
+        return (
+          <SystemDesignDiagram data={String(children).replace(/\n$/, "")} />
+        );
       return (
         <CodeBlock language={language}>
           {String(children).replace(/\n$/, "")}
