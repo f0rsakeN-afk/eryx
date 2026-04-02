@@ -327,4 +327,41 @@ async function streamChat(prompt: string) {
   }
 }
 \`\`\`
+
+---
+
+## 17. System Design
+
+\`\`\`system-design
+{
+  "title": "URL Shortener — Distributed Architecture",
+  "description": "Handles 10B+ redirects/day with sub-10ms p99 latency",
+  "nodes": [
+    { "id": "client",    "type": "client",       "label": "Browser / App",      "x": 0,    "y": 180 },
+    { "id": "dns",       "type": "cdn",           "label": "DNS + CDN",          "description": "Global edge routing", "x": 240,  "y": 40  },
+    { "id": "lb",        "type": "loadbalancer",  "label": "Load Balancer",      "x": 240,  "y": 180 },
+    { "id": "api",       "type": "apigateway",    "label": "API Gateway",        "description": "Auth, rate limiting", "x": 480,  "y": 180 },
+    { "id": "shortener", "type": "service",       "label": "Shortener Service",  "description": "Encodes long URLs",   "x": 720,  "y": 60  },
+    { "id": "redirect",  "type": "service",       "label": "Redirect Service",   "description": "302 → destination",  "x": 720,  "y": 300 },
+    { "id": "cache",     "type": "cache",         "label": "Redis Cluster",      "description": "Hot URLs, 1h TTL",   "x": 960,  "y": 60  },
+    { "id": "db",        "type": "database",      "label": "Cassandra",          "description": "URL mappings",       "x": 960,  "y": 220 },
+    { "id": "kafka",     "type": "queue",         "label": "Kafka",              "description": "Click event stream", "x": 960,  "y": 380 },
+    { "id": "worker",    "type": "worker",        "label": "Analytics Worker",   "x": 1200, "y": 380 },
+    { "id": "storage",   "type": "storage",       "label": "S3 / Analytics DB",  "x": 1200, "y": 500 }
+  ],
+  "edges": [
+    { "source": "client",    "target": "dns",       "label": "Static assets" },
+    { "source": "client",    "target": "lb",        "label": "HTTPS" },
+    { "source": "lb",        "target": "api" },
+    { "source": "api",       "target": "shortener", "label": "POST /shorten" },
+    { "source": "api",       "target": "redirect",  "label": "GET /:code" },
+    { "source": "shortener", "target": "db",        "label": "Write" },
+    { "source": "redirect",  "target": "cache",     "label": "Cache hit", "animated": true },
+    { "source": "redirect",  "target": "db",        "label": "Cache miss" },
+    { "source": "redirect",  "target": "kafka",     "label": "Click event", "animated": true },
+    { "source": "kafka",     "target": "worker",    "animated": true },
+    { "source": "worker",    "target": "storage",   "label": "Aggregate" }
+  ]
+}
+\`\`\`
 `;
