@@ -11,6 +11,8 @@ import {
   useSplitView,
 } from "@/components/main/chat/split-view-context";
 import { Network, X } from "lucide-react";
+import { CreditsButton } from "@/components/main/header/credits-button";
+import { NotificationsButton } from "@/components/main/header/notifications-button";
 
 // ---------------------------------------------------------------------------
 // Code-split heavy components
@@ -52,21 +54,22 @@ const SystemDesignCanvas = dynamic(
 
 function SplitPanel() {
   const splitView = useSplitView();
+
+  // useMemo must be called unconditionally — before any early return
+  const nodes = React.useMemo(() => {
+    try {
+      return JSON.parse(splitView?.splitView?.rawData ?? "")?.nodes ?? [];
+    } catch {
+      return [];
+    }
+  }, [splitView?.splitView?.rawData]);
+
   if (!splitView?.splitView) return null;
 
   const { title, description, rawData } = splitView.splitView;
 
-  // Parse nodes for the legend — needed by SystemDesignCanvas
-  const nodes = React.useMemo(() => {
-    try {
-      return JSON.parse(rawData)?.nodes ?? [];
-    } catch {
-      return [];
-    }
-  }, [rawData]);
-
   return (
-    <div className="flex flex-col w-[45%] min-w-[380px] max-w-[680px] border-l border-border bg-card/30 shrink-0 animate-in slide-in-from-right-4 duration-200">
+    <div className="flex flex-col w-1/2 shrink-0 border-l border-border bg-card/30 animate-in slide-in-from-right-4 duration-200">
       {/* Panel header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/60 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -148,14 +151,18 @@ function ChatPageInner() {
     setInput("");
   }, []);
 
-  const isSplit = !!splitView?.splitView;
-
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
       {/* ── Chat column ───────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">
+        {!splitView?.splitView && (
+          <div className="absolute right-4 top-2 z-10 flex items-center gap-1.5">
+            <CreditsButton />
+            <NotificationsButton />
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto hide-scrollbar">
-          <div className="mx-auto w-full max-w-3xl sm:px-4 md:px-0 py-2">
+          <div className="mx-auto w-full max-w-3xl px-4 py-2">
             {messages.map((message) => (
               <ChatMessage
                 key={message.id}
@@ -168,13 +175,7 @@ function ChatPageInner() {
         </div>
 
         <div className="shrink-0">
-          <div
-            className={
-              isSplit
-                ? "w-full px-4 py-2"
-                : "mx-auto w-full max-w-3xl px-2 md:px-0 py-2"
-            }
-          >
+          <div className="mx-auto w-full max-w-3xl px-4 py-2">
             <ChatInput
               value={input}
               onChange={setInput}

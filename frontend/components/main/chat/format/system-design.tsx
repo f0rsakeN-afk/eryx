@@ -71,6 +71,14 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { CodeBlock } from "./code-block";
 import { useSplitView } from "../split-view-context";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // ── Node type configuration ────────────────────────────────────────────────
 
@@ -336,7 +344,7 @@ function useCssColors() {
 
 // ── Flow canvas ────────────────────────────────────────────────────────────
 
-function FlowCanvas({ rfNodes, rfEdges }: { rfNodes: Node[]; rfEdges: Edge[] }) {
+const FlowCanvas = memo(function FlowCanvas({ rfNodes, rfEdges }: { rfNodes: Node[]; rfEdges: Edge[] }) {
   const [nodes, , onNodesChange] = useNodesState(rfNodes);
   const [edgeState, , onEdgesChange] = useEdgesState(rfEdges);
   const { resolvedTheme } = useTheme();
@@ -408,7 +416,7 @@ function FlowCanvas({ rfNodes, rfEdges }: { rfNodes: Node[]; rfEdges: Edge[] }) 
       />
     </ReactFlow>
   );
-}
+});
 
 // ── Data parsing ────────────────────────────────────────────────────────────
 
@@ -498,7 +506,7 @@ function buildFlowData(parsed: DiagramData) {
 
 // ── Legend ─────────────────────────────────────────────────────────────────
 
-function NodeLegend({ nodes }: { nodes: RawNode[] }) {
+const NodeLegend = memo(function NodeLegend({ nodes }: { nodes: RawNode[] }) {
   const usedTypes = useMemo(() => {
     const seen = new Set<string>();
     nodes.forEach((n) => seen.add((n.type ?? "service").toLowerCase()));
@@ -529,7 +537,7 @@ function NodeLegend({ nodes }: { nodes: RawNode[] }) {
       </div>
     </div>
   );
-}
+});
 
 // ── Panel canvas — used by both fullscreen overlay and split panel ─────────
 
@@ -665,37 +673,39 @@ export const SystemDesignDiagram = memo(function SystemDesignDiagram({
         </div>
       </div>
 
-      {/* ── Fullscreen overlay ──────────────────────────────── */}
-      {fullscreen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background/96 backdrop-blur-md">
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-card/60 shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Network className="w-4 h-4 text-primary" />
+      {/* ── Fullscreen dialog ───────────────────────────────── */}
+      <Dialog open={fullscreen} onOpenChange={setFullscreen}>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogPrimitive.Popup className="fixed inset-0 z-50 flex flex-col bg-background/96 backdrop-blur-md outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-card/60 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Network className="w-4 h-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <DialogTitle className="text-sm font-semibold text-foreground truncate">
+                    {parsed.title || "System Design"}
+                  </DialogTitle>
+                  {parsed.description && (
+                    <p className="text-xs text-muted-foreground/70 truncate">
+                      {parsed.description}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-foreground truncate">
-                  {parsed.title || "System Design"}
-                </h3>
-                {parsed.description && (
-                  <p className="text-xs text-muted-foreground/70 truncate">
-                    {parsed.description}
-                  </p>
-                )}
-              </div>
+              <DialogClose
+                className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                aria-label="Close fullscreen"
+              >
+                <X className="w-4 h-4" />
+              </DialogClose>
             </div>
-            <button
-              onClick={() => setFullscreen(false)}
-              className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              aria-label="Close fullscreen"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
 
-          <SystemDesignCanvas data={data} nodes={parsed.nodes} />
-        </div>
-      )}
+            <SystemDesignCanvas data={data} nodes={parsed.nodes} />
+          </DialogPrimitive.Popup>
+        </DialogPortal>
+      </Dialog>
     </>
   );
 });
