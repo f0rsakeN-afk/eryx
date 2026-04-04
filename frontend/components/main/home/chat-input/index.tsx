@@ -2,20 +2,12 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, ArrowUp, Paperclip, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatedPlaceholder } from "@/components/ui/animated-placeholder";
+import { PlusMenu } from "./plus-menu";
+import { SendButton } from "./send-button";
+import { FilePreviews } from "./file-previews";
 
 const PLACEHOLDERS = [
   "Ask anything…",
@@ -29,6 +21,12 @@ const PLACEHOLDERS = [
   "Turn this chaos into something clean.",
   "Summarize, simplify, or just vibe with me.",
 ];
+
+interface Attachment {
+  file: File;
+  id: string;
+  preview?: string;
+}
 
 interface ChatInputProps {
   value: string;
@@ -45,11 +43,13 @@ export function ChatInput({
   className,
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isComposing, setIsComposing] = React.useState(false);
   const [webSearch, setWebSearch] = React.useState(false);
   const [isMultiline, setIsMultiline] = React.useState(false);
+  const [files, setFiles] = React.useState<Attachment[]>([]);
 
-  const isEmpty = !value.trim();
+  const isEmpty = !value.trim() && files.length === 0;
 
   const syncHeight = React.useCallback(() => {
     const el = textareaRef.current;
@@ -57,23 +57,48 @@ export function ChatInput({
     el.style.height = "auto";
     const scHeight = el.scrollHeight;
     el.style.height = `${Math.min(scHeight, 200)}px`;
-    setIsMultiline(scHeight > 38);
-  }, []);
+    setIsMultiline(scHeight > 38 || files.length > 0);
+  }, [files.length]);
 
   React.useLayoutEffect(() => {
     syncHeight();
-  }, [value, syncHeight]);
+  }, [value, syncHeight, files.length]);
 
   const handleChange = React.useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value),
     [onChange],
   );
 
+  const handleFileClick = React.useCallback(() => fileInputRef.current?.click(), []);
+
+  const handleFileChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    if (selected.length === 0) return;
+
+    const newFiles = selected.map((file) => ({
+      file,
+      id: Math.random().toString(36).substring(7),
+      preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+    }));
+
+    setFiles((prev) => [...prev, ...newFiles]);
+    if (e.target) e.target.value = "";
+  }, []);
+
+  const removeFile = React.useCallback((id: string) => {
+    setFiles((prev) => {
+      const filtered = prev.filter((f) => f.id !== id);
+      const removed = prev.find((f) => f.id === id);
+      if (removed?.preview) URL.revokeObjectURL(removed.preview);
+      return filtered;
+    });
+  }, []);
+
   const handleSubmit = React.useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed && files.length === 0) return;
     onSubmit(trimmed);
-  }, [value, onSubmit]);
+  }, [value, onSubmit, files.length]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -85,73 +110,16 @@ export function ChatInput({
     [handleSubmit, isComposing],
   );
 
-  const PlusMenu = (
-    <Popover>
-      <PopoverTrigger
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-colors active:scale-90"
-        aria-label="More tools"
-      >
-        <Plus className="h-4 w-4" />
-      </PopoverTrigger>
-      <PopoverContent
-        side="top"
-        align="start"
-        sideOffset={12}
-        className="w-48 p-1.5 bg-popover/90 backdrop-blur-xl border-border shadow-xl rounded-2xl animate-in fade-in zoom-in-95 duration-200"
-      >
-        <div className="flex flex-col gap-0.5">
-          <button className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-all active:scale-[0.98]">
-            <Paperclip className="h-4 w-4" />
-            <span>Attach file</span>
-          </button>
-          <button
-            onClick={() => setWebSearch(!webSearch)}
-            className={cn(
-              "flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm transition-all active:scale-[0.98]",
-              webSearch
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            <Globe className="h-4 w-4" />
-            <span>Search the web</span>
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-
-  const SendButton = (
-    <Tooltip>
-      <TooltipTrigger
-        onClick={handleSubmit}
-        disabled={isEmpty}
-        aria-label="Send message"
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200",
-          isEmpty
-            ? "text-muted-foreground/20 bg-transparent cursor-not-allowed"
-            : "bg-primary text-primary-foreground shadow-md hover:scale-105 active:scale-95",
-        )}
-      >
-        <ArrowUp className="h-4 w-4" />
-      </TooltipTrigger>
-      <AnimatePresence>
-        {!isEmpty && (
-          <TooltipContent
-            side="top"
-            sideOffset={12}
-            className="bg-foreground text-background font-medium"
-          >
-            Send <span className="ml-1 opacity-50 text-[10px]">↵</span>
-          </TooltipContent>
-        )}
-      </AnimatePresence>
-    </Tooltip>
-  );
-
   return (
     <TooltipProvider delay={500}>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        multiple
+      />
+
       <motion.div
         layout
         initial={false}
@@ -170,7 +138,7 @@ export function ChatInput({
         <motion.div
           layout
           className={cn(
-            "flex flex-1 items-center min-w-0",
+            "flex flex-1 items-center min-w-0 font-sans",
             isMultiline ? "flex-col items-stretch px-2 pt-1" : "flex-row px-1",
           )}
         >
@@ -185,12 +153,18 @@ export function ChatInput({
                   transition={{ duration: 0.2 }}
                   className="flex items-center shrink-0 pr-1"
                 >
-                  {PlusMenu}
+                  <PlusMenu
+                    onFileSelect={handleFileClick}
+                    webSearch={webSearch}
+                    setWebSearch={setWebSearch}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
 
             <div className="relative flex-1 min-w-0">
+              <FilePreviews files={files} onRemove={removeFile} />
+
               <textarea
                 ref={textareaRef}
                 value={value}
@@ -231,7 +205,7 @@ export function ChatInput({
                   transition={{ duration: 0.2 }}
                   className="flex items-center shrink-0 pl-1"
                 >
-                  {SendButton}
+                  <SendButton onSubmit={handleSubmit} disabled={isEmpty} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -249,10 +223,14 @@ export function ChatInput({
               className="flex items-center justify-between mt-1 px-1 pb-1"
             >
               <motion.div layoutId="plus-wrapper">
-                {PlusMenu}
+                <PlusMenu
+                  onFileSelect={handleFileClick}
+                  webSearch={webSearch}
+                  setWebSearch={setWebSearch}
+                />
               </motion.div>
               <motion.div layoutId="send-wrapper">
-                {SendButton}
+                <SendButton onSubmit={handleSubmit} disabled={isEmpty} />
               </motion.div>
             </motion.div>
           )}
