@@ -6,6 +6,24 @@ import { cn } from "@/lib/utils";
 import { AiResponseFormatter } from "./ai-response-formatter";
 import { MessageActions } from "./message-actions";
 
+/* remove this later on  */
+import { FileSearch } from "lucide-react";
+import {
+  Steps,
+  StepsTrigger,
+  StepsContent,
+  StepsBar,
+  StepsItem,
+} from "@/components/odysseyui/steps";
+
+import {
+  ThoughtChain,
+  ThoughtChainStep,
+  ThoughtChainTrigger,
+  ThoughtChainContent,
+  ThoughtChainItem,
+} from "@/components/odysseyui/thought-chain";
+
 export type MessageRole = "user" | "assistant";
 
 export interface Message {
@@ -14,7 +32,6 @@ export interface Message {
   content: string;
   isStreaming?: boolean; // true while SSE chunks are arriving
 }
-
 
 // ---------------------------------------------------------------------------
 // UserMessage — with copy + inline edit
@@ -124,7 +141,7 @@ const UserMessage = memo(function UserMessage({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
+    <div className="flex flex-col items-end gap-1.5 px-2 sm:px-0">
       <div className="max-w-[75%] rounded-2xl rounded-tr-sm bg-primary px-4 py-2.5 text-[14px] leading-relaxed text-primary-foreground shadow-xs">
         {content}
       </div>
@@ -166,9 +183,84 @@ const AssistantMessage = memo(function AssistantMessage({
   isStreaming?: boolean;
 }) {
   return (
-    <div className="group/assistant-msg min-w-0">
+    <div className="group/assistant-msg min-w-0 sm:max-w-[97%]">
       <AiResponseFormatter content={content} isStreaming={isStreaming} />
-      {!isStreaming && <MessageActions content={content} />}
+      {!isStreaming && (
+        <>
+          <MessageActions content={content} />
+
+          <div className="py-6">
+            <ThoughtChain>
+              <ThoughtChainStep status="done">
+                <ThoughtChainTrigger>
+                  Understanding the codebase
+                </ThoughtChainTrigger>
+                <ThoughtChainContent>
+                  <ThoughtChainItem>
+                    Scanned 47 files across src/ and packages/
+                  </ThoughtChainItem>
+                  <ThoughtChainItem>
+                    Identified React 18 with TypeScript and Tailwind CSS
+                  </ThoughtChainItem>
+                  <ThoughtChainItem>
+                    No existing auth layer detected
+                  </ThoughtChainItem>
+                </ThoughtChainContent>
+              </ThoughtChainStep>
+
+              <ThoughtChainStep status="active">
+                <ThoughtChainTrigger>
+                  Planning the implementation
+                </ThoughtChainTrigger>
+                <ThoughtChainContent>
+                  <ThoughtChainItem>
+                    Choosing NextAuth.js for session management
+                  </ThoughtChainItem>
+                  <ThoughtChainItem>
+                    Designing protected route middleware
+                  </ThoughtChainItem>
+                </ThoughtChainContent>
+              </ThoughtChainStep>
+
+              <ThoughtChainStep status="pending">
+                <ThoughtChainTrigger>Writing the code</ThoughtChainTrigger>
+                <ThoughtChainContent>
+                  <ThoughtChainItem>auth.ts — provider config</ThoughtChainItem>
+                  <ThoughtChainItem>
+                    middleware.ts — route protection
+                  </ThoughtChainItem>
+                  <ThoughtChainItem>SessionProvider wrapper</ThoughtChainItem>
+                </ThoughtChainContent>
+              </ThoughtChainStep>
+            </ThoughtChain>
+          </div>
+
+          <div className="">
+            <div className="w-full max-w-sm">
+              <Steps defaultOpen>
+                <StepsTrigger leftIcon={<FileSearch className="size-4" />}>
+                  Tool run: analyze repo
+                </StepsTrigger>
+                <StepsContent bar={<StepsBar className="mr-2 ml-1.5" />}>
+                  <div className="space-y-1">
+                    <StepsItem>
+                      Cloning repository <strong>odyssey-ui/www</strong>
+                    </StepsItem>
+                    <StepsItem>
+                      Detected <strong>TypeScript</strong> +{" "}
+                      <strong>Tailwind CSS</strong>
+                    </StepsItem>
+                    <StepsItem>
+                      Found 142 components across 6 packages
+                    </StepsItem>
+                    <StepsItem>Dependency graph resolved in 280ms</StepsItem>
+                  </div>
+                </StepsContent>
+              </Steps>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 });
