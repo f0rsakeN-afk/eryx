@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Flag, Loader2, ImagePlus, X, Paperclip } from "lucide-react";
+import { Loader2, ImagePlus, X } from "lucide-react";
+import Image from "next/image";
 import { reportSchema, type ReportSchema } from "@/schemas/report.schema";
 
 import {
@@ -12,7 +13,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -222,10 +222,12 @@ export function ReportDialog({ isOpen, onOpenChange }: ReportDialogProps) {
                 <div className="relative group w-full">
                   <div className="flex items-center gap-3 p-2 rounded-lg border border-border bg-muted/30">
                     <div className="relative w-12 h-12 rounded overflow-hidden shadow-sm border border-border bg-background">
-                      <img
+                      <Image
                         src={imagePreview}
                         alt="Preview"
-                        className="w-full h-full object-cover"
+                        fill
+                        unoptimized
+                        className="object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">

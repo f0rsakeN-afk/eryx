@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "motion/react";
 import { Loader2, Trash2, AlertTriangle } from "lucide-react";
 
 import {
@@ -14,7 +13,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 
 interface DeleteProjectModalProps {
   open: boolean;
@@ -47,7 +45,7 @@ export default function DeleteProjectModal({
             Delete Project
           </AlertDialogTitle>
           <AlertDialogDescription>
-            This action is irreversible. All research, documents, and chat history associated with <span className="font-semibold text-foreground">"{project?.name}"</span> will be permanently deleted.
+            This action is irreversible. All research, documents, and chat history associated with <span className="font-semibold text-foreground">&quot;{project?.name}&quot;</span> will be permanently deleted.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
