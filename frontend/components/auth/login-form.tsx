@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { GoogleIcon, GitHubIcon } from "@/components/auth/brand-icons";
+import { useLogin } from "@/services/auth";
 
 function OAuthButton({
   icon,
@@ -33,8 +34,6 @@ function OAuthButton({
   );
 }
 
-// ─── Form ─────────────────────────────────────────
-
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -43,20 +42,16 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<loginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = async (data: loginInput) => {
-    await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
+  const loginMutation = useLogin();
+
+  const onSubmit = (data: loginInput) => {
+    loginMutation.mutate(data);
   };
 
   return (
@@ -101,7 +96,7 @@ export function LoginForm() {
             type="email"
             placeholder="you@example.com"
             autoFocus
-            disabled={isSubmitting}
+            disabled={loginMutation.isPending}
             className="h-10 rounded-lg"
             {...register("email")}
           />
@@ -131,7 +126,7 @@ export function LoginForm() {
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="••••••••"
-              disabled={isSubmitting}
+              disabled={loginMutation.isPending}
               className="h-10 rounded-lg pr-10"
               {...register("password")}
             />
@@ -158,10 +153,10 @@ export function LoginForm() {
         {/* Submit */}
         <Button
           type="submit"
-          disabled={isSubmitting}
+          disabled={loginMutation.isPending}
           className="w-full h-11 rounded-xl font-semibold mt-2"
         >
-          {isSubmitting ? (
+          {loginMutation.isPending ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" /> Signing in…
             </>

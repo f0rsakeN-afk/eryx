@@ -118,7 +118,7 @@ export const ResourceAllocation = () => {
       className="px-2 xl:px-0 overflow-hidden pb-28 lg:pb-32 mx-auto max-w-6xl"
     >
       <div className="">
-        <h2 className="container text-center text-3xl tracking-tight text-balance sm:text-4xl md:text-5xl lg:text-6xl">
+        <h2 className="container font-display text-center text-3xl tracking-tight text-balance sm:text-4xl md:text-5xl lg:text-6xl">
           Streamline your system design and execution
         </h2>
 

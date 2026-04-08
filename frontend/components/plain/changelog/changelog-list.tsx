@@ -170,13 +170,13 @@ export function ChangelogList({ entries }: ChangelogListProps) {
                     </span>
                     <time
                       dateTime={entry.date}
-                      className="text-xs text-muted-foreground/70"
+                      className="text-xs tracking-wide text-muted-foreground/70"
                     >
                       {formatDate(entry.date)}
                     </time>
                   </div>
 
-                  <h2 className="text-base font-semibold text-foreground tracking-tight mb-1.5">
+                  <h2 className="text-base tracking-wide font-semibold text-foreground tracking-tight mb-1.5">
                     {entry.title}
                   </h2>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-5">

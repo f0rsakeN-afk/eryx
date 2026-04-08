@@ -76,7 +76,7 @@ export const FAQ = ({
         <div className={cn("mx-auto grid gap-16 lg:grid-cols-2", className2)}>
           <div className="space-y-4">
             {headerTag === "h1" ? (
-              <h1 className="text-2xl tracking-tight md:text-4xl lg:text-5xl">
+              <h1 className="text-2xl font-display tracking-tight md:text-4xl lg:text-5xl">
                 Got Questions?
               </h1>
             ) : (
@@ -102,8 +102,8 @@ export const FAQ = ({
                 <Accordion className="w-full">
                   {category.questions.map((item, i) => (
                     <AccordionItem key={i} value={`${categoryIndex}-${i}`}>
-                      <AccordionTrigger>{item.question}</AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">
+                      <AccordionTrigger className='font-semibold tracking-wide'>{item.question}</AccordionTrigger>
+                      <AccordionContent className="">
                         {item.answer}
                       </AccordionContent>
                     </AccordionItem>

@@ -5,3 +5,11 @@ export function getSiteURL(): string {
   }
   return siteURL || "snippio.xyz";
 }
+
+export function getBackendUrl(): string {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (!backendUrl) {
+    console.log("NEXT_PUBLIC_BACKEND_URL");
+  }
+  return backendUrl || "http://127.0.0.1:5000";
+}

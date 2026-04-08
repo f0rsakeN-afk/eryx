@@ -35,7 +35,7 @@ export default function Hero() {
           <div className="relative my-20 flex max-w-6xl flex-col items-center px-6 lg:items-start">
             {/* Title */}
             <motion.div
-              className="text-center text-[30px]  leading-none font-bold sm:text-[3.5rem] sm:leading-tight lg:text-left"
+              className="text-center text-[30px] font-display leading-none font-bold sm:text-[3.5rem] sm:leading-tight lg:text-left"
               variants={textVariants}
               initial="hidden"
               animate="visible"
@@ -64,7 +64,7 @@ export default function Hero() {
                 delay: 0.4,
               }}
             >
-              <p className="text-base text-muted-foreground sm:text-lg font-medium">
+              <p className="text-base text-muted-foreground sm:text-lg font-medium text-justify">
                 Eryx combines intelligent search with system design
                 visualization, helping you explore, understand, and build
                 scalable architectures with clarity.
@@ -82,7 +82,7 @@ export default function Hero() {
               }}
             >
               <Link href="/signup" className="">
-                <Button className=" font-semibold font-poppins">
+                <Button className=" font-semibold cursor-pointer">
                   Create Account Today <LogIn />
                 </Button>
               </Link>

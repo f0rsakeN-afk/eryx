@@ -171,7 +171,7 @@ export function Footer() {
   return (
     <footer className="flex flex-col items-center gap-14 py-28">
       <div className="container space-y-3 text-center">
-        <h2 className="text-2xl tracking-tight md:text-4xl lg:text-5xl">
+        <h2 className="text-2xl font-semibold font-display tracking-tight md:text-4xl lg:text-5xl">
           Start your free trial today
         </h2>
         <p className="text-muted-foreground mx-auto max-w-xl leading-snug text-balance">

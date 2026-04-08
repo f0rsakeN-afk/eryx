@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Check, ArrowRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { tiers, featureGroups } from "@/lib/data/pricing";
+import { tiers, featureGroups } from "@/data/pricing";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";

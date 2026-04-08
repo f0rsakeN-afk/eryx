@@ -38,7 +38,7 @@ export const updatePasswordSchema = z.object({
 });
 
 export type loginInput = z.infer<typeof loginSchema>;
-export type sgnupInput = z.infer<typeof signupSchema>;
+export type signupInput = z.infer<typeof signupSchema>;
 export type verifyEmailInput = z.infer<typeof verifyEmailAddressSchema>;
 export type forgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type resetPasswordInput = z.infer<typeof resetPasswordSchema>;

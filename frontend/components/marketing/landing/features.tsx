@@ -38,10 +38,10 @@ export const Features = () => {
 
         {/* Content */}
         <div className="mx-auto mt-10 grid max-w-5xl items-center gap-3 md:gap-0 lg:mt-24 lg:grid-cols-2">
-          <h2 className="text-2xl tracking-tight md:text-4xl lg:text-5xl">
+          <h2 className="text-2xl tracking-tight font-display md:text-4xl lg:text-5xl">
             Built for developers who think in systems
           </h2>
-          <p className="text-muted-foreground leading-snug">
+          <p className="text-muted-foreground leading-snug text-justify">
             Eryx combines intelligent search with system design visualization,
             helping you explore complex architectures, understand them clearly,
             and build with confidence.
@@ -70,7 +70,7 @@ export const Features = () => {
                       "group flex items-center justify-between gap-4 pe-4 pt-4 md:pe-6 md:pt-6"
                     }
                   >
-                    <h3 className="font-display max-w-60 text-2xl leading-tight font-bold tracking-tight">
+                    <h3 className="max-w-60 text-2xl leading-tight font-bold tracking-tight">
                       {item.title}
                     </h3>
                     <div className="rounded-full border p-2">

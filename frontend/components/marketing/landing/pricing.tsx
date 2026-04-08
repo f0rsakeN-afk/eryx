@@ -61,7 +61,7 @@ export const Pricing = ({ className }: { className?: string }) => {
     >
       <div className="  flex flex-col justify-center items-center">
         <div className="space-y-4 text-center">
-          <h2 className="text-2xl tracking-tight md:text-4xl lg:text-5xl">
+          <h2 className="text-2xl font-display tracking-tight md:text-4xl lg:text-5xl">
             Pricing
           </h2>
           <p className="text-muted-foreground mx-auto max-w-xl leading-snug text-balance">

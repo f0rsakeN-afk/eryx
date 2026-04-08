@@ -93,7 +93,7 @@ export default function StatusPage() {
           <p className="text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground mb-5">
             Platform Operations
           </p>
-          <h1 className="text-4xl md:text-[3.25rem] font-semibold tracking-tight text-foreground mb-6 leading-[1.1]">
+          <h1 className="text-4xl md:text-[3.25rem] font-display font-semibold tracking-tight text-foreground mb-6 leading-[1.1]">
             System Health
           </h1>
           <p className="text-base text-muted-foreground max-w-lg mx-auto leading-relaxed font-medium mb-8">
