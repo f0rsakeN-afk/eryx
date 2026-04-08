@@ -1,18 +1,33 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+//import { Inter, JetBrains_Mono } from "next/font/google";
+// import { Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/shared/theme-provider";
-import { PageTransitionProvider } from "@/components/shared/page-transition-provider";
+import MainLayout from "./mainLayout";
+//import { PageTransitionProvider } from "@/components/shared/page-transition-provider";
 
-const inter = Inter({
-  variable: "--font-inter",
+// const inter = Inter({
+//   variable: "--font-inter",
+//   subsets: ["latin"],
+//   display: "swap",
+// });
+
+// const jetbrainsMono = JetBrains_Mono({
+//   variable: "--font-jetbrains",
+//   subsets: ["latin"],
+//   display: "swap",
+// });
+
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
+  variable: "--font-sans",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains",
+const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -31,11 +46,12 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased scroll-smooth`}
+      className={`${plusJakartaSans.variable} ${sourceSerif.variable} [--font-code:var(--font-sans)] h-full antialiased scroll-smooth`}
     >
-      <body className="min-h-dvh flex flex-col bg-background text-foreground font-sans">
+      <body className="min-h-dvh flex flex-col bg-background text-foreground">
         <ThemeProvider defaultTheme="dark" attribute="class">
-          <PageTransitionProvider>{children}</PageTransitionProvider>
+          {/* <PageTransitionProvider>{children}</PageTransitionProvider> */}
+          <MainLayout>{children}</MainLayout>
         </ThemeProvider>
       </body>
     </html>

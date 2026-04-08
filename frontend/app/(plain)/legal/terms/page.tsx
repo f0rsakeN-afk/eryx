@@ -62,7 +62,7 @@ export default function TermsPage() {
             {/* Sidebar */}
             <aside className="hidden lg:block">
               <div className="sticky top-20">
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-4 px-2">
+                <p className="text-xs font-semibold uppercase tracking-widest  text-primary mb-4 px-2">
                   Contents
                 </p>
                 <LegalToc items={sections} />
@@ -72,7 +72,7 @@ export default function TermsPage() {
             {/* Content */}
             <main className="min-w-0">
               <div className="mb-8 pb-8 border-b border-border">
-                <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+                <h1 className="text-3xl font-display font-semibold tracking-tight text-foreground">
                   Terms of Service
                 </h1>
                 <p className="mt-3 text-base text-muted-foreground leading-relaxed max-w-xl">

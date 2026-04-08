@@ -148,7 +148,7 @@ export default function ChangelogPage() {
 
         <div className="max-w-5xl mx-auto px-6 py-12 lg:py-16">
           <div className="mb-12 lg:mb-16">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            <h1 className="text-3xl font-display font-semibold tracking-tight text-foreground">
               Changelog
             </h1>
             <p className="mt-3 text-base text-muted-foreground leading-relaxed max-w-xl">

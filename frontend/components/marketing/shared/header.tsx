@@ -42,7 +42,7 @@ function NavLink({
     <Link
       href={href}
       onClick={onClick}
-      className={`relative text-sm   duration-200 group ${
+      className={`relative text-sm font-medium tracking-wide duration-200 group ${
         active
           ? "text-foreground"
           : "text-muted-foreground hover:text-foreground"

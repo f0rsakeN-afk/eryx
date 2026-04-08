@@ -5,11 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
-import { signupSchema, type sgnupInput } from "@/schemas/auth";
+import { signupSchema, type signupInput } from "@/schemas/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { GoogleIcon, GitHubIcon } from "@/components/auth/brand-icons";
+import { useSignup } from "@/services/auth";
 
 function OAuthButton({
   icon,
@@ -96,8 +97,8 @@ export function SignupForm() {
     register,
     handleSubmit,
     watch,
-    formState: { errors, isSubmitting },
-  } = useForm<sgnupInput>({
+    formState: { errors },
+  } = useForm<signupInput>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
       firstName: "",
@@ -108,20 +109,16 @@ export function SignupForm() {
     },
   });
 
+  const signupMutation = useSignup();
+
   // eslint-disable-next-line react-hooks/incompatible-library
   const passwordValue = watch("password");
 
-  const onSubmit = async (data: sgnupInput) => {
+  const onSubmit = async (data: signupInput) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confirmPassword: _, ...payload } = data;
 
-    await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+
   };
 
   return (
@@ -163,7 +160,7 @@ export function SignupForm() {
               id="firstName"
               placeholder="Alex"
               autoFocus
-              disabled={isSubmitting}
+              disabled={signupMutation.isPending}
               className="h-10 rounded-lg"
               {...register("firstName")}
             />
@@ -181,7 +178,7 @@ export function SignupForm() {
             <Input
               id="lastName"
               placeholder="Johnson"
-              disabled={isSubmitting}
+              disabled={signupMutation.isPending}
               className="h-10 rounded-lg"
               {...register("lastName")}
             />
@@ -202,7 +199,7 @@ export function SignupForm() {
             id="email"
             type="email"
             placeholder="you@example.com"
-            disabled={isSubmitting}
+            disabled={signupMutation.isPending}
             className="h-10 rounded-lg"
             {...register("email")}
           />
@@ -223,7 +220,7 @@ export function SignupForm() {
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Min. 6 characters"
-              disabled={isSubmitting}
+              disabled={signupMutation.isPending}
               className="h-10 rounded-lg pr-10"
               {...register("password")}
             />
@@ -258,7 +255,7 @@ export function SignupForm() {
               id="confirmPassword"
               type={showConfirm ? "text" : "password"}
               placeholder="Repeat your password"
-              disabled={isSubmitting}
+              disabled={signupMutation.isPending}
               className="h-10 rounded-lg pr-10"
               {...register("confirmPassword")}
             />
@@ -284,10 +281,10 @@ export function SignupForm() {
         {/* Submit */}
         <Button
           type="submit"
-          disabled={isSubmitting}
+          disabled={signupMutation.isPending}
           className="w-full h-11 rounded-xl font-semibold mt-2"
         >
-          {isSubmitting ? (
+          {signupMutation.isPending ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" /> Creating
               account…

@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import Script from "next/script";
 import { cn } from "@/lib/utils";
-import { tiers, featureGroups } from "@/lib/data/pricing";
+import { tiers, featureGroups } from "@/data/pricing";
 import {
   PricingCard,
   ComparisonRow,
@@ -64,14 +64,16 @@ export default function PricingPage() {
             <p className="text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground mb-5">
               Pricing
             </p>
-            <h1 className="text-4xl md:text-[3.25rem] font-semibold tracking-tight text-foreground mb-5 leading-[1.1]">
+            <h1 className="text-4xl font-display md:text-[3.25rem] font-semibold tracking-tight text-foreground mb-5 leading-[1.1]">
               Enterprise-grade AI, priced for scale.
               <br />
-              <span className="text-muted-foreground/60">No hidden complexity.</span>
+              <span className="text-muted-foreground/60">
+                No hidden complexity.
+              </span>
             </h1>
             <p className="text-base text-muted-foreground max-w-md mx-auto leading-relaxed font-medium">
-              Transparent pricing designed to scale with your architecture. Start
-              building immediately with zero upfront commitment.
+              Transparent pricing designed to scale with your architecture.
+              Start building immediately with zero upfront commitment.
             </p>
           </div>
         </section>
@@ -187,12 +189,12 @@ export default function PricingPage() {
         <section className="py-20 border-t border-border">
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
             <div>
-              <p className="text-base font-semibold text-foreground mb-1.5">
+              <p className="text-base font-display font-semibold text-foreground mb-1.5">
                 Ready to scale?
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed max-w-sm font-medium">
-                Deploy with confidence. Transition seamlessly as your operational
-                requirements expand.
+                Deploy with confidence. Transition seamlessly as your
+                operational requirements expand.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 shrink-0">

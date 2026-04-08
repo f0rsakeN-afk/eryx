@@ -120,7 +120,7 @@ export const IncidentItem = memo(function IncidentItem({
           {date}
         </div>
         <div className="flex flex-col gap-1.5">
-          <h4 className="text-sm font-semibold text-foreground tracking-tight">
+          <h4 className="text-sm font-semibold tracking-wide text-foreground tracking-tight">
             {title}
           </h4>
           <p className="text-xs text-muted-foreground leading-relaxed font-medium">

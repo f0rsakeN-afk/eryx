@@ -29,10 +29,10 @@ const IntegrationItem = ({
     whileTap={{ scale: 0.95 }}
   >
     <div className="flex items-center gap-2">
-      <Icon className="h-8 w-8" />
+      <Icon className="h-8 w-8 text-primary" />
       <div className="flex flex-col text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="text-primary font-medium">
+        <span className="text-muted-foreground font-medium">{label}</span>
+        <span className="text-primary font-semibold tracking-wide">
           {product}
           <sup>*</sup>
         </span>
@@ -211,7 +211,7 @@ export default function IntegrationBox() {
               </motion.div>
               <div className="flex flex-col text-xs">
                 <span className="text-muted-foreground">1/12 Launch</span>
-                <span className="text-primary font-medium ">
+                <span className="text-primary font-semibold tracking-wide">
                   More coming soon
                 </span>
               </div>

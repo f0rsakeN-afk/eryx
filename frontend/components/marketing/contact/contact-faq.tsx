@@ -53,10 +53,10 @@ export function ContactFaq() {
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             FAQ
           </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground font-display">
             Common questions
           </h2>
-          <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xs">
+          <p className="mt-3 tracking-wide text-sm text-muted-foreground leading-relaxed max-w-xs">
             Can&apos;t find what you&apos;re looking for? Send us a message and
             we&apos;ll get back to you.
           </p>
@@ -66,10 +66,10 @@ export function ContactFaq() {
         <Accordion>
           {FAQS.map((faq) => (
             <AccordionItem key={faq.value} value={faq.value}>
-              <AccordionTrigger className="py-4 text-sm font-medium text-foreground hover:no-underline">
+              <AccordionTrigger className="py-4 text-sm font-semibold tracking-wide text-foreground hover:no-underline">
                 {faq.question}
               </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground leading-relaxed">
+              <AccordionContent className="leading-relaxed">
                 {faq.answer}
               </AccordionContent>
             </AccordionItem>

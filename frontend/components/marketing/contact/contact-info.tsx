@@ -44,7 +44,7 @@ export function ContactInfo() {
     <div className="flex flex-col gap-8 lg:py-2">
       {/* Hero */}
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-3xl font-display font-semibold tracking-tight text-foreground">
           We&apos;d love to hear from you
         </h1>
         <p className="mt-3 text-base text-muted-foreground leading-relaxed max-w-sm">
@@ -91,7 +91,7 @@ export function ContactInfo() {
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground   duration-200"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground tracking-wide font-semibold duration-200"
           >
             <Icon className="w-4 h-4" />
             {label}

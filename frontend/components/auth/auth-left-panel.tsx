@@ -131,14 +131,14 @@ export function AuthLeftPanel() {
         {/* Mid: headline + features + marquee */}
         <div className="flex flex-col gap-8">
           <div>
-            <h1 className="text-[2.5rem] font-semibold tracking-tight text-foreground leading-[1.15]">
+            <h1 className="text-[2.5rem] font-display font-semibold tracking-tight text-foreground leading-[1.15]">
               Everything you need.
               <br />
               <span className="text-muted-foreground">
                 Nothing you don&apos;t.
               </span>
             </h1>
-            <p className="mt-3.5 text-sm text-muted-foreground leading-relaxed max-w-[340px]">
+            <p className="mt-3.5 font-medium text-sm text-muted-foreground leading-relaxed max-w-[340px]">
               The modern workspace for teams who care about craft and speed.
             </p>
           </div>
@@ -148,12 +148,12 @@ export function AuthLeftPanel() {
               <div key={label} className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
                   <Icon
-                    className="w-4 h-4 text-muted-foreground shrink-0"
+                    className="w-4 h-4 text-primary shrink-0"
                     strokeWidth={1.75}
                   />
-                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  <p className="text-sm font-semibold text-primary">{label}</p>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed pl-6">
+                <p className="text-xs text-muted-foreground tracking-wide leading-relaxed pl-6">
                   {desc}
                 </p>
               </div>
@@ -197,11 +197,11 @@ export function AuthLeftPanel() {
         <div className="flex items-center gap-8 border-t border-border pt-5">
           {STATS.map(({ value, label }) => (
             <div key={label}>
-              <p className="text-sm font-semibold text-foreground">{value}</p>
-              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="text-sm font-bold text-primary">{value}</p>
+              <p className="text-xs text-muted-foreground tracking-wide">{label}</p>
             </div>
           ))}
-          <p className="ml-auto text-xs text-muted-foreground">
+          <p className="ml-auto tracking-wider text-xs text-muted-foreground">
             Trusted worldwide
           </p>
         </div>
