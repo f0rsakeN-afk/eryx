@@ -14,7 +14,6 @@ import { MemoryDialog } from "@/components/main/memory/memory-dialog";
 export default function HomePage() {
   const router = useRouter();
   const [input, setInput] = useState("");
-  const [webSearch, setWebSearch] = useState(false);
   const [memoryDialogOpen, setMemoryDialogOpen] = useState(false);
   const [heading] = useState(
     () => HEADING_PHRASES[Math.floor(Math.random() * HEADING_PHRASES.length)],
@@ -43,14 +42,13 @@ export default function HomePage() {
 
         // Navigate to the new chat with the message as a query param
         const triggerParam = shouldTriggerAI ? "&trigger=1" : "";
-        const webSearchParam = webSearch ? "&web=1" : "";
-        router.push(`/chat/${chatId}?q=${encodeURIComponent(value)}${triggerParam}${webSearchParam}`);
+        router.push(`/chat/${chatId}?q=${encodeURIComponent(value)}${triggerParam}`);
       } catch (error) {
         console.error("Error creating chat:", error);
         setIsCreating(false);
       }
     },
-    [router, isCreating, webSearch]
+    [router, isCreating]
   );
 
   // Closes the modal and populates the input in one go.
@@ -89,8 +87,7 @@ export default function HomePage() {
             onChange={setInput}
             onSubmit={handleSubmit}
             isLoading={isCreating}
-            webSearch={webSearch}
-            setWebSearch={setWebSearch}
+            onOpenMemory={() => setMemoryDialogOpen(true)}
           />
         </div>
       </div>
@@ -99,6 +96,11 @@ export default function HomePage() {
         chip={activeChip}
         onClose={handleModalClose}
         onSelect={handlePromptSelect}
+      />
+
+      <MemoryDialog
+        isOpen={memoryDialogOpen}
+        onOpenChange={setMemoryDialogOpen}
       />
     </div>
   );

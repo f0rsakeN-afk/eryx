@@ -10,7 +10,7 @@ import { retryQueueService } from "@/services/retry-queue.service";
 interface UseChatMessagesOptions {
   chatId: string;
   initialQuery?: string;
-  isWebSearch?: boolean;
+  skipFirstMessage?: boolean; // true when chat was created via /api/chats with firstMessage
 }
 
 interface UseChatMessagesResult {
@@ -30,7 +30,7 @@ interface UseChatMessagesResult {
 export function useChatMessages({
   chatId,
   initialQuery,
-  isWebSearch = false,
+  skipFirstMessage = false,
 }: UseChatMessagesOptions): UseChatMessagesResult {
   const queryClient = useQueryClient();
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -110,9 +110,77 @@ export function useChatMessages({
       const cachedData = queryClient.getQueryData<{ pages: Array<{ messages: Message[] }> }>(["chat-messages", chatId]);
       // Check if there are any messages in cache (excluding seed which isn't in query cache)
       const hasMessagesInCache = cachedData?.pages?.some(page => page.messages.length > 0);
-      const isFirstMessage = !hasMessagesInCache;
+      const isFirstMessage = !hasMessagesInCache && !skipFirstMessage;
 
-      if (isFirstMessage) {
+      if (skipFirstMessage) {
+        // Message was already saved via /api/chats - add AI placeholder and stream response
+        console.debug("[sendUserMessage] skipFirstMessage=true, streaming AI response");
+
+        queryClient.setQueryData(
+          ["chat-messages", chatId],
+          (old: { pages: Array<{ messages: Message[] }> } | undefined) => {
+            if (!old) return old;
+            return {
+              ...old,
+              pages: old.pages.map((page, i) =>
+                i === 0
+                  ? { messages: [...(page.messages || []), { id: aiMsgId, role: "assistant", content: "", isStreaming: true }] }
+                  : page
+              ),
+            };
+          }
+        );
+
+        try {
+          await streamChat(
+            chatId,
+            [{ role: "user" as const, content }],
+            {
+              onChunk: (delta) => {
+                queryClient.setQueryData(
+                  ["chat-messages", chatId],
+                  (old: { pages: Array<{ messages: Message[] }> } | undefined) => {
+                    if (!old) return old;
+                    return {
+                      ...old,
+                      pages: old.pages.map((page) => ({
+                        ...page,
+                        messages: page.messages.map((m) =>
+                          m.id === aiMsgId ? { ...m, content: m.content + delta } : m
+                        ),
+                      })),
+                    };
+                  }
+                );
+              },
+              onComplete: () => {
+                queryClient.setQueryData(
+                  ["chat-messages", chatId],
+                  (old: { pages: Array<{ messages: Message[] }> } | undefined) => {
+                    if (!old) return old;
+                    return {
+                      ...old,
+                      pages: old.pages.map((page) => ({
+                        ...page,
+                        messages: page.messages.map((m) =>
+                          m.id === aiMsgId ? { ...m, isStreaming: false } : m
+                        ),
+                      })),
+                    };
+                  }
+                );
+                queryClient.invalidateQueries({ queryKey: ["chat-messages", chatId] });
+              },
+            },
+            abortControllerRef.current.signal
+          );
+        } catch (err) {
+          console.error("[sendUserMessage] error:", err);
+          isStreamingRef.current = false;
+          abortControllerRef.current = null;
+          throw err;
+        }
+      } else if (isFirstMessage) {
         // FIRST MESSAGE: Save to DB, let query naturally show saved message.
         // The AI placeholder is added via setQueryData and persists separately.
         // We DON'T invalidate - let the query show real data when it fetches.
@@ -191,7 +259,7 @@ export function useChatMessages({
               },
             },
             abortControllerRef.current.signal,
-            isWebSearch ? "web" : "chat"
+            "chat"
           );
         } catch (err) {
           console.error("[sendUserMessage] error:", err);
@@ -293,7 +361,7 @@ export function useChatMessages({
               },
             },
             abortControllerRef.current.signal,
-            isWebSearch ? "web" : "chat"
+            "chat"
           );
         } catch (err) {
           console.error("[sendUserMessage] error:", err);

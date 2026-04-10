@@ -23,7 +23,7 @@ export async function GET(
 
     // Verify project ownership
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id, deletedAt: null },
+      where: { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -32,7 +32,7 @@ export async function GET(
 
     // Get files
     const files = await prisma.file.findMany({
-      where: { projectId, deletedAt: null },
+      where: { projectId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -79,7 +79,7 @@ export async function POST(
 
     // Verify project ownership
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id, deletedAt: null },
+      where: { id: projectId, userId: user.id },
     });
 
     if (!project) {

@@ -7,7 +7,6 @@ export interface ChatWithMessages {
   title: string;
   createdAt: Date;
   updatedAt: Date;
-  deletedAt: Date | null;
   archivedAt: Date | null;
   projectId: string | null;
   messages: {
@@ -38,7 +37,6 @@ export async function getUserChats(userId: string, limit = 20, cursor?: string) 
   const chats = await prisma.chat.findMany({
     where: {
       userId,
-      deletedAt: null,
     },
     orderBy: { updatedAt: "desc" },
     take: limit + 1,
@@ -190,7 +188,7 @@ export async function getChatById(chatId: string, userId: string) {
 
   // Fallback to DB
   const chat = await prisma.chat.findFirst({
-    where: { id: chatId, userId, deletedAt: null },
+    where: { id: chatId, userId },
     select: {
       id: true,
       title: true,
@@ -209,7 +207,7 @@ export async function updateChat(
 ) {
   // Verify ownership first
   const existing = await prisma.chat.findFirst({
-    where: { id: chatId, userId, deletedAt: null },
+    where: { id: chatId, userId },
     select: { id: true, userId: true },
   });
 
@@ -258,7 +256,7 @@ export async function updateChat(
 export async function deleteChat(chatId: string, userId: string) {
   // Verify ownership first
   const existing = await prisma.chat.findFirst({
-    where: { id: chatId, userId, deletedAt: null },
+    where: { id: chatId, userId },
     select: { id: true },
   });
 
@@ -266,9 +264,8 @@ export async function deleteChat(chatId: string, userId: string) {
     throw new Error("Chat not found");
   }
 
-  await prisma.chat.update({
+  await prisma.chat.delete({
     where: { id: chatId },
-    data: { deletedAt: new Date() },
   });
 
   // Clear cache
@@ -311,9 +308,9 @@ export async function getChatMessages(
   // Fallback to DB with bidirectional pagination
   const whereClause = cursor
     ? direction === "before"
-      ? { chatId, chat: { userId, deletedAt: null }, deletedAt: null, id: { lt: cursor } }
-      : { chatId, chat: { userId, deletedAt: null }, deletedAt: null, id: { gt: cursor } }
-    : { chatId, chat: { userId, deletedAt: null }, deletedAt: null };
+      ? { chatId, chat: { userId }, id: { lt: cursor } }
+      : { chatId, chat: { userId }, id: { gt: cursor } }
+    : { chatId, chat: { userId } };
 
   const messages = await prisma.message.findMany({
     where: whereClause,
@@ -374,7 +371,7 @@ export async function addChatMessage(
 ) {
   // Verify user owns this chat
   const chat = await prisma.chat.findFirst({
-    where: { id: chatId, userId, deletedAt: null },
+    where: { id: chatId, userId },
     select: { id: true },
   });
 
@@ -382,7 +379,7 @@ export async function addChatMessage(
     // Debug: check what chat actually exists
     const anyChat = await prisma.chat.findUnique({
       where: { id: chatId },
-      select: { id: true, userId: true, deletedAt: true },
+      select: { id: true, userId: true },
     });
     throw new Error("Chat not found");
   }
@@ -448,7 +445,7 @@ export async function getRecentMessages(chatId: string, limit = 20) {
 
   // Fallback to DB
   const messages = await prisma.message.findMany({
-    where: { chatId, deletedAt: null },
+    where: { chatId },
     orderBy: { createdAt: "desc" },
     take: limit,
     select: { id: true, role: true, content: true, createdAt: true },
