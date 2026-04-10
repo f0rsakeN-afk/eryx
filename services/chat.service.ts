@@ -155,8 +155,7 @@ export async function streamChat(
   messages: Array<{ role: string; content: string }>,
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
-  mode?: "chat" | "web",
-  performWebSearch?: boolean
+  mode?: "chat" | "web"
 ): Promise<string> {
   const { onChunk, onComplete, onError } = callbacks;
 
@@ -164,7 +163,7 @@ export async function streamChat(
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId, messages, mode, performWebSearch }),
+      body: JSON.stringify({ chatId, messages, mode }),
       signal,
     });
 

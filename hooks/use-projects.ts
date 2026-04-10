@@ -121,7 +121,7 @@ export function useUpdateProject() {
 }
 
 /**
- * Delete project (soft delete)
+ * Delete project
  */
 export function useDeleteProject() {
   const queryClient = useQueryClient();
@@ -138,30 +138,6 @@ export function useDeleteProject() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-}
-
-/**
- * Restore project
- */
-export function useRestoreProject() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (trashId: string): Promise<{ restored: string[]; orphans: string[] }> => {
-      const res = await fetch(`/api/trash/${trashId}/restore`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to restore project");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["trash"] });
     },
   });
 }

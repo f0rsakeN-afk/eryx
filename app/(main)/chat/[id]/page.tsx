@@ -319,7 +319,7 @@ function ChatPageInner() {
     loadOlder,
     hasOlder,
     isFetchingOlder,
-  } = useChatMessages({ chatId, initialQuery, isWebSearch: webSearch });
+  } = useChatMessages({ chatId, initialQuery, skipFirstMessage: shouldTriggerAI });
 
   // Auto-trigger AI response for first message when navigating from home
   React.useEffect(() => {
@@ -361,8 +361,6 @@ function ChatPageInner() {
               onChange={setInput}
               onSubmit={handleSubmit}
               placeholder="Ask a follow-up…"
-              webSearch={webSearch}
-              setWebSearch={setWebSearch}
               onOpenMemory={() => setMemoryDialogOpen(true)}
             />
           </div>

@@ -14,7 +14,7 @@ export async function GET(
 
     const { id } = await params;
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id, deletedAt: null },
+      where: { id, userId: user.id },
       select: {
         id: true,
         name: true,
@@ -56,7 +56,7 @@ export async function PATCH(
 
     // Verify ownership first
     const existing = await prisma.project.findFirst({
-      where: { id, userId: user.id, deletedAt: null },
+      where: { id, userId: user.id },
       select: { id: true },
     });
 
@@ -108,7 +108,7 @@ export async function DELETE(
 
     // Verify ownership first
     const existing = await prisma.project.findFirst({
-      where: { id, userId: user.id, deletedAt: null },
+      where: { id, userId: user.id },
       select: { id: true },
     });
 
@@ -116,9 +116,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    await prisma.project.update({
+    await prisma.project.delete({
       where: { id },
-      data: { deletedAt: new Date() },
     });
 
     return NextResponse.json({ success: true });
