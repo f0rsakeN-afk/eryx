@@ -8,6 +8,7 @@ export interface Message {
   content: string;
   createdAt?: string;
   isStreaming?: boolean;
+  chatId?: string; // Included so branch feature can access chatId from message
 }
 
 export interface Chat {
@@ -18,6 +19,7 @@ export interface Chat {
   projectId: string | null;
   messageCount: number;
   firstMessagePreview: string | null;
+  parentChatId?: string | null;
 }
 
 export interface ChatListResponse {
@@ -95,6 +97,19 @@ export async function updateChat(
 export async function deleteChat(chatId: string): Promise<void> {
   const res = await fetch(`/api/chats/${chatId}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete chat");
+}
+
+export async function branchChat(
+  chatId: string,
+  messageId: string
+): Promise<{ newChatId: string; branchTitle: string; messageCount: number }> {
+  const res = await fetch(`/api/chats/${chatId}/branch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messageId }),
+  });
+  if (!res.ok) throw new Error("Failed to branch chat");
+  return res.json();
 }
 
 // Messages

@@ -10,8 +10,11 @@ import { SplitViewContext } from "@/components/main/chat/split-view-context";
 import { useOptimizedScroll } from "@/hooks/use-optimized-scroll";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MemoryDialog } from "@/components/main/memory/memory-dialog";
-import { cn } from "@/lib/utils";
-import { MessageSkeleton, TypingIndicator } from "@/components/main/chat/message-skeleton";
+// import { cn } from "@/lib/utils";
+// import {
+//   MessageSkeleton,
+//   TypingIndicator,
+// } from "@/components/main/chat/message-skeleton";
 
 // =========================================
 // Code-split heavy components (loaded on demand)
@@ -24,7 +27,7 @@ const ChatMessage = dynamic(
     })),
   {
     ssr: false,
-    loading: () => <MessageSkeleton />,
+    // loading: () => <MessageSkeleton />,
   },
 );
 
@@ -40,55 +43,55 @@ const SystemDesignCanvas = dynamic(
 // Skeleton components — premium loading states
 // =========================================
 
-function ChatPageSkeleton() {
-  return (
-    <div className="flex h-dvh flex-col bg-background">
-      {/* Topbar skeleton */}
-      <div className="h-14 border-b border-border/50 px-4 flex items-center gap-4 shrink-0">
-        <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
-        <div className="h-4 w-32 rounded bg-muted/50 animate-pulse" />
-        <div className="ml-auto flex gap-2">
-          <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
-          <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
-        </div>
-      </div>
+// function ChatPageSkeleton() {
+//   return (
+//     <div className="flex h-dvh flex-col bg-background">
+//       {/* Topbar skeleton */}
+//       <div className="h-14 border-b border-border/50 px-4 flex items-center gap-4 shrink-0">
+//         <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
+//         <div className="h-4 w-32 rounded bg-muted/50 animate-pulse" />
+//         <div className="ml-auto flex gap-2">
+//           <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
+//           <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
+//         </div>
+//       </div>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-1">
-          {/* Welcome message skeleton */}
-          <div className="py-4 px-2">
-            <div className="flex gap-3">
-              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 ring-1 ring-primary/20 shrink-0" />
-              <div className="flex-1 space-y-3 max-w-[80%]">
-                <div className="h-4 w-full rounded bg-muted/50 animate-pulse" />
-                <div className="h-4 w-3/4 rounded bg-muted/50 animate-pulse" />
-                <div className="h-4 w-1/2 rounded bg-muted/50 animate-pulse" />
-              </div>
-            </div>
-          </div>
+//       {/* Messages area */}
+//       <div className="flex-1 overflow-y-auto">
+//         <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-1">
+//           {/* Welcome message skeleton */}
+//           <div className="py-4 px-2">
+//             <div className="flex gap-3">
+//               <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 ring-1 ring-primary/20 shrink-0" />
+//               <div className="flex-1 space-y-3 max-w-[80%]">
+//                 <div className="h-4 w-full rounded bg-muted/50 animate-pulse" />
+//                 <div className="h-4 w-3/4 rounded bg-muted/50 animate-pulse" />
+//                 <div className="h-4 w-1/2 rounded bg-muted/50 animate-pulse" />
+//               </div>
+//             </div>
+//           </div>
 
-          {/* User message skeleton */}
-          <MessageSkeleton isUser />
+//           {/* User message skeleton */}
+//           <MessageSkeleton isUser />
 
-          {/* Assistant messages */}
-          <MessageSkeleton />
-          <MessageSkeleton />
+//           {/* Assistant messages */}
+//           <MessageSkeleton />
+//           <MessageSkeleton />
 
-          {/* Typing indicator */}
-          <TypingIndicator />
-        </div>
-      </div>
+//           {/* Typing indicator */}
+//           <TypingIndicator />
+//         </div>
+//       </div>
 
-      {/* Input area skeleton */}
-      <div className="shrink-0 border-t border-border/50 p-3">
-        <div className="mx-auto max-w-3xl">
-          <div className="h-12 rounded-2xl bg-muted/50 ring-1 ring-border/50 animate-pulse" />
-        </div>
-      </div>
-    </div>
-  );
-}
+//       {/* Input area skeleton */}
+//       <div className="shrink-0 border-t border-border/50 p-3">
+//         <div className="mx-auto max-w-3xl">
+//           <div className="h-12 rounded-2xl bg-muted/50 ring-1 ring-border/50 animate-pulse" />
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
@@ -110,12 +113,21 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 
 const MessageItem = React.memo(function MessageItem({
   message,
+  chatId,
   onEdit,
 }: {
   message: Message;
+  chatId: string;
   onEdit: (id: string, content: string) => void;
 }) {
-  return <ChatMessage key={message.id} message={message} onEdit={onEdit} />;
+  return (
+    <ChatMessage
+      key={message.id}
+      message={message}
+      chatId={chatId}
+      onEdit={onEdit}
+    />
+  );
 });
 
 const SplitPanel = React.memo(function SplitPanel() {
@@ -189,6 +201,7 @@ const SplitPanel = React.memo(function SplitPanel() {
 
 interface VirtualizedMessageListProps {
   messages: Message[];
+  chatId: string;
   onEdit: (id: string, content: string) => void;
   onLoadOlder: () => void;
   hasOlder: boolean;
@@ -197,6 +210,7 @@ interface VirtualizedMessageListProps {
 
 function VirtualizedMessageList({
   messages,
+  chatId,
   onEdit,
   onLoadOlder,
   hasOlder,
@@ -207,7 +221,8 @@ function VirtualizedMessageList({
   const lastCount = React.useRef(messages.length);
   const isStreamingRef = React.useRef(false);
 
-  const { scrollToBottom, markManualScroll, isNearBottom } = useOptimizedScroll(parentRef);
+  const { scrollToBottom, markManualScroll, isNearBottom } =
+    useOptimizedScroll(parentRef);
 
   // Use simple virtual scrolling with CSS
   const virtualizer = useVirtualizer({
@@ -240,7 +255,9 @@ function VirtualizedMessageList({
 
   // Auto-scroll to bottom as streaming response arrives
   React.useEffect(() => {
-    const hasStreaming = messages.some(m => "isStreaming" in m && m.isStreaming);
+    const hasStreaming = messages.some(
+      (m) => "isStreaming" in m && m.isStreaming,
+    );
     const wasStreaming = isStreamingRef.current;
     isStreamingRef.current = hasStreaming;
 
@@ -296,18 +313,22 @@ function VirtualizedMessageList({
             }}
           >
             {items.map((virtualItem) => {
-                const message = messages[virtualItem.index];
-                return (
-                  <div
-                    key={virtualItem.key}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
-                    style={{ padding: "8px 0" }}
-                  >
-                    <MessageItem message={message} onEdit={onEdit} />
-                  </div>
-                );
-              })}
+              const message = messages[virtualItem.index];
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={virtualizer.measureElement}
+                  style={{ padding: "8px 0" }}
+                >
+                  <MessageItem
+                    message={message}
+                    chatId={chatId}
+                    onEdit={onEdit}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -341,11 +362,20 @@ function ChatPageInner() {
     loadOlder,
     hasOlder,
     isFetchingOlder,
-  } = useChatMessages({ chatId, initialQuery, skipFirstMessage: shouldTriggerAI });
+  } = useChatMessages({
+    chatId,
+    initialQuery,
+    skipFirstMessage: shouldTriggerAI,
+  });
 
   // Auto-trigger AI response for first message when navigating from home
   React.useEffect(() => {
-    if (shouldTriggerAI && !isLoading && !hasTriggeredAI.current && initialQuery) {
+    if (
+      shouldTriggerAI &&
+      !isLoading &&
+      !hasTriggeredAI.current &&
+      initialQuery
+    ) {
       hasTriggeredAI.current = true;
       // Always send the initialQuery directly - don't look for existing messages
       // because the seed message and any saved messages are the same content
@@ -362,7 +392,7 @@ function ChatPageInner() {
     [sendUserMessage],
   );
 
-  if (isLoading) return <ChatPageSkeleton />;
+  if (isLoading) return <div />;
   if (isError) return <ErrorState onRetry={refetch} />;
 
   return (
@@ -370,6 +400,7 @@ function ChatPageInner() {
       <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">
         <VirtualizedMessageList
           messages={messages}
+          chatId={chatId}
           onEdit={() => {}}
           onLoadOlder={loadOlder}
           hasOlder={hasOlder}
@@ -388,7 +419,10 @@ function ChatPageInner() {
           </div>
         </div>
 
-        <MemoryDialog isOpen={memoryDialogOpen} onOpenChange={setMemoryDialogOpen} />
+        <MemoryDialog
+          isOpen={memoryDialogOpen}
+          onOpenChange={setMemoryDialogOpen}
+        />
       </div>
 
       <SplitPanel />

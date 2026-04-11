@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { getChats, createChat, updateChat, deleteChat } from "@/services/chat.service";
+import { getChats, createChat, updateChat, deleteChat, branchChat } from "@/services/chat.service";
 import type { Chat } from "@/services/chat.service";
 
 interface UseSidebarChatsResult {
@@ -14,6 +14,7 @@ interface UseSidebarChatsResult {
   renameChat: (chatId: string, title: string) => Promise<Chat>;
   deleteChatById: (chatId: string) => Promise<void>;
   archiveChat: (chatId: string) => Promise<Chat>;
+  branchChat: (chatId: string, messageId: string) => Promise<{ newChatId: string }>;
 }
 
 export function useSidebarChats(): UseSidebarChatsResult {
@@ -154,6 +155,15 @@ export function useSidebarChats(): UseSidebarChatsResult {
     },
   });
 
+  // Branch chat
+  const branchMutation = useMutation({
+    mutationFn: ({ chatId, messageId }: { chatId: string; messageId: string }) =>
+      branchChat(chatId, messageId),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    },
+  });
+
   const createNewChat = useCallback(
     (firstMessage?: string) => createMutation.mutateAsync(firstMessage),
     [createMutation]
@@ -175,6 +185,12 @@ export function useSidebarChats(): UseSidebarChatsResult {
     [archiveMutation]
   );
 
+  const branchChatFn = useCallback(
+    (chatId: string, messageId: string) =>
+      branchMutation.mutateAsync({ chatId, messageId }),
+    [branchMutation]
+  );
+
   return {
     chats: data?.chats || [],
     isLoading,
@@ -184,5 +200,6 @@ export function useSidebarChats(): UseSidebarChatsResult {
     renameChat,
     deleteChatById,
     archiveChat,
+    branchChat: branchChatFn,
   };
 }

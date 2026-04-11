@@ -297,10 +297,12 @@ export async function getChatMessages(
   direction: "before" | "after" = "before"
 ) {
   // Try cache first (only for "before" direction with no cursor)
-  if (!cursor || direction === "before") {
+  if (!cursor && direction === "before") {
     const cached = await redis.lrange(KEYS.chatMessages(chatId), 0, -1);
-    if (cached.length >= limit && !cursor) {
+    if (cached.length >= limit) {
       const messages = cached.map((m: string) => JSON.parse(m));
+      // Cache stores messages in chronological order (oldest first)
+      // For "before" direction we need chronological, so no reverse needed
       return { messages, nextCursor: null, prevCursor: null };
     }
   }
@@ -327,14 +329,27 @@ export async function getChatMessages(
   const hasMore = messages.length > limit;
   if (hasMore) messages.pop();
 
-  // For "before", reverse to get chronological order
-  const orderedMessages = direction === "before" ? messages.reverse() : messages;
+  // For "before", reverse to get chronological order (oldest first)
+  // IMPORTANT: use spread to avoid mutating the original array
+  const orderedMessages = direction === "before" ? [...messages].reverse() : messages;
+
+  // For "before" pagination, nextCursor should be the OLDEST message's ID
+  // (so next fetch gets messages older than that)
+  // For "after", nextCursor should be the NEWEST message's ID
+  // Since messages array after query is in reverse chronological order for "before",
+  // messages[0] is oldest and messages[messages.length-1] is newest
+  const nextCursorId = hasMore
+    ? direction === "before"
+      ? messages[0].id  // oldest message for "before"
+      : messages[messages.length - 1].id  // newest message for "after"
+    : null;
 
   // Populate cache (only for initial "before" load)
+  // Use rpush so messages are stored in retrieval order (lrange returns left to right)
   if (!cursor && orderedMessages.length > 0 && direction === "before") {
     const pipeline = redis.pipeline();
     orderedMessages.forEach((msg: typeof orderedMessages[number]) => {
-      pipeline.lpush(
+      pipeline.rpush(
         KEYS.chatMessages(chatId),
         JSON.stringify({
           id: msg.id,
@@ -355,11 +370,7 @@ export async function getChatMessages(
       content: m.content,
       createdAt: m.createdAt.toISOString(),
     })),
-    nextCursor: hasMore
-      ? direction === "before"
-        ? messages[messages.length - 1].id
-        : messages[0].id
-      : null,
+    nextCursor: nextCursorId,
     prevCursor: cursor || null,
   };
 }

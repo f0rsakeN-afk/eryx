@@ -6,6 +6,7 @@ import {
   Archive,
   Download,
   ExternalLink,
+  GitBranch,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -34,6 +35,7 @@ interface HistoryItem {
   title: string;
   createdAt?: string;
   updatedAt?: string;
+  parentChatId?: string | null;
 }
 
 interface ChatHistoryItemProps {
@@ -203,6 +205,9 @@ export function ChatHistoryItem({ item, onDelete, onRename }: ChatHistoryItemPro
           render={
             <Link href={`/chat/${item.id}`} className="flex min-w-0 items-center gap-2 pr-7" onMouseEnter={() => prefetchOnHover(item.id)}>
               <span className="flex-1 font-semibold tracking-wider truncate text-[12.5px]">
+                {item.parentChatId && (
+                  <GitBranch className="inline-block h-3 w-3 mr-1.5 text-sidebar-foreground/40 align-text-bottom" />
+                )}
                 {item.title}
               </span>
             </Link>
