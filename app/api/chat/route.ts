@@ -6,9 +6,9 @@ import { getRecentMessages } from "@/lib/stack-server";
 import { buildChatContext } from "@/lib/context-manager";
 import { buildSystemPrompt, type PromptConfig } from "@/lib/prompts";
 import { validateAuth } from "@/lib/auth";
+import { aiConfig } from "@/lib/config";
 
 const groq = new Groq();
-const MODEL = "llama-3.1-8b-instant";
 
 /**
  * Build system prompt with search context
@@ -48,11 +48,11 @@ async function buildMessages(
     projectInstruction: chat.project?.instruction || undefined,
   };
 
-  const recentMessages = await getRecentMessages(chatId, 50);
+  const recentMessages = await getRecentMessages(chatId, aiConfig.maxRecentMessages);
 
   const { messages: contextMessages, systemPrompt: optimizedSystemPrompt, truncated, keyFacts } =
     await buildChatContext(recentMessages, {
-      maxTokens: 6000,
+      maxTokens: aiConfig.maxContextTokens,
       systemPrompt: buildSystemPrompt(promptConfig),
     });
 
@@ -128,11 +128,11 @@ export async function POST(req: NextRequest) {
 
     // Stream from Groq
     const stream = await groq.chat.completions.create({
-      model: MODEL,
+      model: aiConfig.model,
       messages: fullMessages as any,
       stream: true,
-      temperature: 0.7,
-      max_tokens: 2048,
+      temperature: aiConfig.temperature,
+      max_tokens: aiConfig.maxTokens,
     });
 
     const encoder = new TextEncoder();

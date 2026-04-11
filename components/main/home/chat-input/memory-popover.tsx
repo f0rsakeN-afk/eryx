@@ -72,7 +72,6 @@ export function MemoryPopover({ onOpenMemory, onMemoriesSelect }: MemoryPopoverP
             align="start"
             sideOffset={12}
             className="w-80 p-0 overflow-hidden rounded-xl border border-border bg-background shadow-lg"
-            asChild
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: -4 }}

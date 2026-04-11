@@ -54,6 +54,11 @@ model Chat {
   chatFiles ChatFile[]
   messages  Message[]
 
+  // Branch tracking
+  parentChatId String?
+  parentChat   Chat?    @relation("ChatBranches", fields: [parentChatId], references: [id], onDelete: SetNull)
+  branches     Chat[]   @relation("ChatBranches")
+
   // Share settings
   visibility     String    @default("private") // "private" | "public"
   shareToken     String?   @unique @default(cuid())
@@ -65,6 +70,7 @@ model Chat {
   @@index([archivedAt])
   @@index([userId, updatedAt])
   @@index([shareToken])
+  @@index([parentChatId])
 }
 
 enum SENDER {

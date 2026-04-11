@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useCallback, useEffect, useRef } from "react";
-import { Copy, Check, Volume2, Pause, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Copy, Check, Volume2, Pause, ThumbsUp, ThumbsDown, GitBranch, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -9,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { branchChat } from "@/services/chat.service";
 
 // Strip markdown/rich text formatting for clean speech
 function cleanTextForSpeech(text: string): string {
@@ -58,6 +59,7 @@ export const MessageActions = memo(function MessageActions({
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"like" | "dislike" | null>(initialReaction);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isBranching, setIsBranching] = useState(false);
 
   // Use ref to track mounted state and avoid state updates after unmount
   const isMountedRef = useRef(true);
@@ -212,6 +214,18 @@ export const MessageActions = memo(function MessageActions({
   const handleLike = useCallback(() => handleReaction("like"), [handleReaction]);
   const handleDislike = useCallback(() => handleReaction("dislike"), [handleReaction]);
 
+  const handleBranch = useCallback(async () => {
+    if (!messageId || !chatId) return;
+    setIsBranching(true);
+    try {
+      const res = await branchChat(chatId, messageId);
+      window.location.href = `/chat/${res.newChatId}`;
+    } catch (err) {
+      console.error("Failed to branch chat:", err);
+      setIsBranching(false);
+    }
+  }, [messageId, chatId]);
+
   return (
     <TooltipProvider delay={400}>
       <div
@@ -296,6 +310,28 @@ export const MessageActions = memo(function MessageActions({
           </TooltipTrigger>
           <TooltipContent side="bottom" align="center">
             Poor response
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Branch Action */}
+        <Tooltip>
+          <TooltipTrigger
+            onClick={handleBranch}
+            disabled={isBranching}
+            aria-label="Branch from this message"
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted/80 focus-visible:bg-muted/80",
+              isBranching ? "text-primary" : "text-muted-foreground/40 hover:text-muted-foreground"
+            )}
+          >
+            {isBranching ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <GitBranch className="h-4 w-4" />
+            )}
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="center">
+            Branch from here
           </TooltipContent>
         </Tooltip>
       </div>
