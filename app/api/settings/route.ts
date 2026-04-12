@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
 import { updateSettingsSchema } from "@/schemas/validation";
+import { getUserSettings, invalidateUserSettingsCache } from "@/services/settings.service";
 
 const DEFAULT_SETTINGS = {
   theme: "system",
@@ -35,33 +36,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const settings = await prisma.settings.findUnique({
-      where: { userId: user.id },
-    });
+    // Use cached settings (falls back to defaults if no record)
+    const settings = await getUserSettings(user.id);
 
-    if (!settings) {
-      return NextResponse.json(DEFAULT_SETTINGS);
-    }
-
-    return NextResponse.json({
-      theme: settings.theme,
-      language: settings.language,
-      autoTitle: settings.autoTitle,
-      enterToSend: settings.enterToSend,
-      showSuggestions: settings.showSuggestions,
-      compactMode: settings.compactMode,
-      reducedMotion: settings.reducedMotion,
-      streaming: settings.streaming,
-      codeHighlight: settings.codeHighlight,
-      persistentMemory: settings.persistentMemory,
-      emailUpdates: settings.emailUpdates,
-      emailMarketing: settings.emailMarketing,
-      browserNotifs: settings.browserNotifs,
-      usageAlerts: settings.usageAlerts,
-      analytics: settings.analytics,
-      usageData: settings.usageData,
-      crashReports: settings.crashReports,
-    });
+    return NextResponse.json(settings);
   } catch (error) {
     console.error("Get settings error:", error);
     return NextResponse.json({ error: "Failed to get settings" }, { status: 500 });
@@ -111,6 +89,9 @@ export async function PATCH(request: NextRequest) {
       },
       update: data,
     });
+
+    // Invalidate cache so next request gets fresh data
+    await invalidateUserSettingsCache(user.id);
 
     return NextResponse.json({
       theme: settings.theme,

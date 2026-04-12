@@ -43,7 +43,14 @@ export function useMemories() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error('Failed to add memory');
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: 'Failed to add memory' }));
+        const err = new Error(error.error || 'Failed to add memory') as Error & { code?: string; message?: string; upgradeTo?: string };
+        err.code = error.code;
+        err.message = error.message;
+        err.upgradeTo = error.upgradeTo;
+        throw err;
+      }
       return res.json();
     },
     onSuccess: () => {

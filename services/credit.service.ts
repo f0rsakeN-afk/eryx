@@ -6,6 +6,7 @@
 
 import prisma from "@/lib/prisma";
 import { stripeConfig } from "@/lib/stripe-config";
+import { invalidateUserLimitsCache } from "@/services/limit.service";
 
 // Credit costs remain in stripe-config (not plan-specific)
 export type CreditOperation = keyof typeof stripeConfig.creditCosts;
@@ -88,6 +89,9 @@ export async function deductCredits(
             // Keep maxChats/maxProjects/maxMessages as is to maintain fair usage limits
           },
         });
+
+        // Invalidate cache so next request gets fresh free tier limits
+        await invalidateUserLimitsCache(userId);
       }
     }
 

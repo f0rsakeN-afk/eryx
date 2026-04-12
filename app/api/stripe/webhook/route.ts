@@ -9,6 +9,7 @@ import Stripe from "stripe";
 import { stripeConfig } from "@/lib/stripe-config";
 import { SubscriptionStatus } from "@/src/generated/prisma/client";
 import prisma from "@/lib/prisma";
+import { invalidateUserLimitsCache } from "@/services/limit.service";
 
 const stripe = new Stripe(stripeConfig.secretKey);
 
@@ -95,6 +96,9 @@ export async function POST(request: NextRequest) {
                 features: plan.features,
               },
             });
+
+            // Invalidate cache so next request gets fresh limits
+            await invalidateUserLimitsCache(userId);
           }
 
           console.log(`Subscription created for user ${userId}, plan ${planId}`);
@@ -182,6 +186,9 @@ export async function POST(request: NextRequest) {
               `Subscription ended for user ${existingSub.userId}. ` +
               `Kept ${remainingCredits} credits, features: ${keepFeatures ? "kept" : "removed"}`
             );
+
+            // Invalidate cache so next request gets fresh limits
+            await invalidateUserLimitsCache(existingSub.userId);
           }
         }
         break;

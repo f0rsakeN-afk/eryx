@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { validateAuth } from "@/lib/auth";
+import { checkBranchLimit, getUserLimits } from "@/services/limit.service";
 
 export async function POST(
   request: NextRequest,
@@ -32,6 +33,40 @@ export async function POST(
     const branchPointIndex = originalChat.messages.findIndex((m) => m.id === messageId);
     if (branchPointIndex === -1) {
       return NextResponse.json({ error: "Message not found in chat" }, { status: 404 });
+    }
+
+    // Check branch limit
+    const limitCheck = await checkBranchLimit(user.id, chatId);
+    if (!limitCheck.allowed) {
+      const limits = await getUserLimits(user.id);
+
+      if (limits.maxBranchesPerChat === 0) {
+        return NextResponse.json(
+          {
+            error: "Chat branches not available",
+            code: "BRANCH_NOT_AVAILABLE",
+            message: "Upgrade to a paid plan to unlock chat branching and explore different conversation paths.",
+            action: "upgrade",
+            upgradeTo: "Pro",
+          },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error: "Branch limit reached",
+          code: "BRANCH_LIMIT_REACHED",
+          message: `You've reached the maximum of ${limitCheck.limit} branches for this chat.`,
+          action: "upgrade",
+          upgradeTo: null,
+          limits: {
+            current: limitCheck.current,
+            max: limitCheck.limit,
+          },
+        },
+        { status: 403 }
+      );
     }
 
     const messagesToCopy = originalChat.messages.slice(0, branchPointIndex + 1);

@@ -2,10 +2,20 @@
  * Limit Service
  * Checks user limits based on their plan
  * Handles all edge cases for feature access
+ * Includes caching to avoid hitting DB on every request
  */
 
 import prisma from "@/lib/prisma";
-import { getPlan } from "@/services/plan.service";
+import { getPlan, type PlanData } from "@/services/plan.service";
+import redis from "@/lib/redis";
+
+const CACHE_TTL = 300; // 5 minutes
+
+interface CachedUserLimits {
+  plan: PlanData | null;
+  isActiveSubscription: boolean;
+  expiresAt: number;
+}
 
 export interface LimitCheckResult {
   allowed: boolean;
@@ -24,56 +34,134 @@ export interface UserLimits {
   canExport: boolean;
   canApiAccess: boolean;
   hasFeature: (feature: string) => boolean;
+  planName: string;
+  planTier: string;
 }
 
 /**
  * Get user's current limits based on their plan
+ * Uses Redis caching to avoid hitting DB on every request
  */
 export async function getUserLimits(userId: string): Promise<UserLimits> {
+  const cacheKey = `user:limits:${userId}`;
+
+  // Try to get from cache first
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      const parsed: CachedUserLimits = JSON.parse(cached);
+      if (Date.now() < parsed.expiresAt) {
+        return buildUserLimits(parsed.plan);
+      }
+    }
+  } catch {
+    // Redis error, continue to DB
+  }
+
+  // Fetch from DB
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       userPlan: true,
-      subscription: {
-        where: {
-          status: { in: ["ACTIVE", "TRIALING"] },
-        },
-      },
+      subscription: true,
     },
   });
 
-  // Determine effective plan limits
-  // If user has active subscription, use that plan
-  // Otherwise, check if they have credits remaining with their last plan
-  // Otherwise fall back to free tier
+  // Determine effective plan based on subscription status
+  let effectivePlan: PlanData | null = null;
+  let isActiveSubscription = false;
 
-  let effectivePlan = user?.userPlan;
+  if (user?.subscription) {
+    const sub = user.subscription;
+    const now = new Date();
 
-  if (!effectivePlan || user?.subscription === null) {
-    // Check if user has credits from a paid plan they lost
-    // If they have credits and had paid features, keep limits
-    const hasCreditsRemaining = (user?.credits || 0) > 0;
-    const hadPaidPlan = user?.planTier && user.planTier !== "FREE";
-
-    if (!hasCreditsRemaining || !hadPaidPlan) {
-      // Get free tier
-      effectivePlan = await getPlan("free");
+    if (sub.status === "ACTIVE" || sub.status === "TRIALING") {
+      if (sub.currentPeriodEnd > now || sub.cancelAtPeriodEnd) {
+        // Subscription is active
+        isActiveSubscription = true;
+        effectivePlan = user.userPlan;
+      }
     }
-    // If has credits but no active subscription, keep their plan until credits run out
   }
 
-  const plan = effectivePlan || await getPlan("free");
+  // If no effective plan from subscription, check if user has plan with credits
+  if (!effectivePlan) {
+    if (user?.userPlan && user.credits > 0) {
+      // User has credits remaining from their plan, keep using it
+      effectivePlan = user.userPlan;
+    } else {
+      // Fall back to free tier
+      effectivePlan = await getPlan("free");
+    }
+  }
+
+  // If subscription ended but user has credits, they keep plan benefits
+  // If subscription ended AND credits are 0, strip to free tier
+
+  // Cache the result
+  const toCache: CachedUserLimits = {
+    plan: effectivePlan,
+    isActiveSubscription,
+    expiresAt: Date.now() + CACHE_TTL * 1000,
+  };
+
+  try {
+    await redis.setEx(cacheKey, CACHE_TTL, JSON.stringify(toCache));
+  } catch {
+    // Redis error, ignore
+  }
+
+  return buildUserLimits(effectivePlan);
+}
+
+function buildUserLimits(plan: PlanData | null): UserLimits {
+  const effectivePlan = plan || {
+    maxMemoryItems: 0,
+    maxBranchesPerChat: 0,
+    maxFolders: 0,
+    maxAttachmentsPerChat: 0,
+    maxFileSizeMb: 0,
+    canExport: false,
+    canApiAccess: false,
+    features: [],
+    id: "free",
+    tier: "FREE",
+    name: "Free",
+    description: "",
+    price: 0,
+    stripePriceId: null,
+    stripeProductId: null,
+    credits: 25,
+    maxChats: 100,
+    maxProjects: 2,
+    maxMessages: 100,
+    isActive: true,
+    isVisible: true,
+  };
 
   return {
-    maxMemoryItems: plan.maxMemoryItems,
-    maxBranchesPerChat: plan.maxBranchesPerChat,
-    maxFolders: plan.maxFolders,
-    maxAttachmentsPerChat: plan.maxAttachmentsPerChat,
-    maxFileSizeMb: plan.maxFileSizeMb,
-    canExport: plan.canExport,
-    canApiAccess: plan.canApiAccess,
-    hasFeature: (feature: string) => plan.features.includes(feature),
+    maxMemoryItems: effectivePlan.maxMemoryItems,
+    maxBranchesPerChat: effectivePlan.maxBranchesPerChat,
+    maxFolders: effectivePlan.maxFolders,
+    maxAttachmentsPerChat: effectivePlan.maxAttachmentsPerChat,
+    maxFileSizeMb: effectivePlan.maxFileSizeMb,
+    canExport: effectivePlan.canExport,
+    canApiAccess: effectivePlan.canApiAccess,
+    hasFeature: (feature: string) => effectivePlan.features.includes(feature),
+    planName: effectivePlan.name,
+    planTier: effectivePlan.tier,
   };
+}
+
+/**
+ * Invalidate user's limits cache (call when plan changes)
+ */
+export async function invalidateUserLimitsCache(userId: string): Promise<void> {
+  try {
+    await redis.del(`user:limits:${userId}`);
+  } catch {
+    // Redis error, ignore
+  }
 }
 
 /**
@@ -82,15 +170,15 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
 export async function checkChatLimit(userId: string): Promise<LimitCheckResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { _count: { select: { chats: true } }, maxChats: true },
+    select: { maxChats: true },
   });
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
+  const chatCount = await prisma.chat.count({
+    where: { userId, archivedAt: null },
+  });
 
-  const current = user._count.chats;
-  const limit = user.maxChats;
+  const current = chatCount;
+  const limit = user?.maxChats ?? 100;
 
   if (limit === -1) {
     return { allowed: true }; // unlimited
@@ -112,17 +200,14 @@ export async function checkChatLimit(userId: string): Promise<LimitCheckResult> 
  * Check if user can create a new project
  */
 export async function checkProjectLimit(userId: string): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { _count: { select: { projects: true } }, maxProjects: true },
+  const limits = await getUserLimits(userId);
+
+  const projectCount = await prisma.project.count({
+    where: { userId, archivedAt: null },
   });
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  const current = user._count.projects;
-  const limit = user.maxProjects;
+  const current = projectCount;
+  const limit = limits.maxProjects;
 
   if (limit === -1) {
     return { allowed: true };
@@ -144,17 +229,9 @@ export async function checkProjectLimit(userId: string): Promise<LimitCheckResul
  * Check if user can add a memory item
  */
 export async function checkMemoryLimit(userId: string): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { _count: { select: { memories: true } }, maxMemoryItems: true },
-  });
+  const limits = await getUserLimits(userId);
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  // Check if user has feature
-  if (user.maxMemoryItems === 0) {
+  if (limits.maxMemoryItems === 0) {
     return {
       allowed: false,
       error: "Memory feature not available on your plan. Upgrade to add memories.",
@@ -162,11 +239,15 @@ export async function checkMemoryLimit(userId: string): Promise<LimitCheckResult
     };
   }
 
-  const current = user._count.memories;
-  const limit = user.maxMemoryItems;
+  const memoryCount = await prisma.memory.count({
+    where: { userId },
+  });
+
+  const current = memoryCount;
+  const limit = limits.maxMemoryItems;
 
   if (limit === -1) {
-    return { allowed: true }; // unlimited
+    return { allowed: true };
   }
 
   if (current >= limit) {
@@ -185,16 +266,9 @@ export async function checkMemoryLimit(userId: string): Promise<LimitCheckResult
  * Check if user can create a branch for a chat
  */
 export async function checkBranchLimit(userId: string, chatId: string): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { maxBranchesPerChat: true },
-  });
+  const limits = await getUserLimits(userId);
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  if (user.maxBranchesPerChat === 0) {
+  if (limits.maxBranchesPerChat === 0) {
     return {
       allowed: false,
       error: "Chat branches not available on your plan. Upgrade to use branches.",
@@ -206,38 +280,32 @@ export async function checkBranchLimit(userId: string, chatId: string): Promise<
     where: { parentChatId: chatId },
   });
 
-  const limit = user.maxBranchesPerChat;
+  const current = branchCount;
+  const limit = limits.maxBranchesPerChat;
 
   if (limit === -1) {
     return { allowed: true };
   }
 
-  if (branchCount >= limit) {
+  if (current >= limit) {
     return {
       allowed: false,
-      current: branchCount,
+      current,
       limit,
       error: `Branch limit reached (${limit}) per chat.`,
     };
   }
 
-  return { allowed: true, current: branchCount, limit };
+  return { allowed: true, current, limit };
 }
 
 /**
  * Check if user can create a folder
  */
 export async function checkFolderLimit(userId: string): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { maxFolders: true },
-  });
+  const limits = await getUserLimits(userId);
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  if (user.maxFolders === 0) {
+  if (limits.maxFolders === 0) {
     return {
       allowed: false,
       error: "Folders not available on your plan. Upgrade to use folders.",
@@ -245,26 +313,16 @@ export async function checkFolderLimit(userId: string): Promise<LimitCheckResult
     };
   }
 
-  // Assuming you have a Folder model - placeholder for now
-  // const folderCount = await prisma.folder.count({ where: { userId } });
-
-  return { allowed: true };
+  return { allowed: true, limit: limits.maxFolders };
 }
 
 /**
  * Check if user can add attachments to a chat
  */
 export async function checkAttachmentLimit(userId: string, chatId: string): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { maxAttachmentsPerChat: true },
-  });
+  const limits = await getUserLimits(userId);
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  if (user.maxAttachmentsPerChat === 0) {
+  if (limits.maxAttachmentsPerChat === 0) {
     return {
       allowed: false,
       error: "Attachments not available on your plan. Upgrade to add files.",
@@ -276,38 +334,32 @@ export async function checkAttachmentLimit(userId: string, chatId: string): Prom
     where: { chatId },
   });
 
-  const limit = user.maxAttachmentsPerChat;
+  const current = attachmentCount;
+  const limit = limits.maxAttachmentsPerChat;
 
   if (limit === -1) {
     return { allowed: true };
   }
 
-  if (attachmentCount >= limit) {
+  if (current >= limit) {
     return {
       allowed: false,
-      current: attachmentCount,
+      current,
       limit,
       error: `Attachment limit reached (${limit}) per chat.`,
     };
   }
 
-  return { allowed: true, current: attachmentCount, limit };
+  return { allowed: true, current, limit };
 }
 
 /**
  * Check if user can export chats
  */
 export async function checkExportLimit(userId: string): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { canExport: true },
-  });
+  const limits = await getUserLimits(userId);
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  if (!user.canExport) {
+  if (!limits.canExport) {
     return {
       allowed: false,
       error: "Export not available on your plan. Upgrade to export chats.",
@@ -322,16 +374,9 @@ export async function checkExportLimit(userId: string): Promise<LimitCheckResult
  * Check if user can use API
  */
 export async function checkApiAccessLimit(userId: string): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { canApiAccess: true },
-  });
+  const limits = await getUserLimits(userId);
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  if (!user.canApiAccess) {
+  if (!limits.canApiAccess) {
     return {
       allowed: false,
       error: "API access not available on your plan. Upgrade for API access.",
@@ -346,16 +391,9 @@ export async function checkApiAccessLimit(userId: string): Promise<LimitCheckRes
  * Check file size limit
  */
 export async function checkFileSizeLimit(userId: string, fileSizeMb: number): Promise<LimitCheckResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { maxFileSizeMb: true },
-  });
+  const limits = await getUserLimits(userId);
 
-  if (!user) {
-    return { allowed: false, error: "User not found" };
-  }
-
-  if (user.maxFileSizeMb === 0) {
+  if (limits.maxFileSizeMb === 0) {
     return {
       allowed: false,
       error: "File uploads not available on your plan.",
@@ -363,13 +401,13 @@ export async function checkFileSizeLimit(userId: string, fileSizeMb: number): Pr
     };
   }
 
-  if (fileSizeMb > user.maxFileSizeMb) {
+  if (fileSizeMb > limits.maxFileSizeMb) {
     return {
       allowed: false,
-      limit: user.maxFileSizeMb,
-      error: `File too large. Max size: ${user.maxFileSizeMb}MB.`,
+      limit: limits.maxFileSizeMb,
+      error: `File too large. Max size: ${limits.maxFileSizeMb}MB.`,
     };
   }
 
-  return { allowed: true, limit: user.maxFileSizeMb };
+  return { allowed: true, limit: limits.maxFileSizeMb };
 }

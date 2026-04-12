@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
 import { updateCustomizeSchema } from "@/schemas/validation";
+import { invalidateUserPreferencesCache } from "@/services/preferences.service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,6 +102,9 @@ export async function PATCH(request: NextRequest) {
         ...(interests !== undefined && { interest: interestArray }),
       },
     });
+
+    // Invalidate cache so next request gets fresh data
+    await invalidateUserPreferencesCache(user.id);
 
     return NextResponse.json({
       firstName: customize.firstName || "",
