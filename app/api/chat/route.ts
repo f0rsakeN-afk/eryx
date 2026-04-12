@@ -7,6 +7,7 @@ import { buildChatContext } from "@/lib/context-manager";
 import { buildSystemPrompt, type PromptConfig } from "@/lib/prompts";
 import { validateAuth } from "@/lib/auth";
 import { aiConfig } from "@/lib/config";
+import { getUserPreferences } from "@/services/preferences.service";
 
 const groq = new Groq();
 
@@ -21,11 +22,7 @@ async function buildMessages(
     where: { id: chatId },
     include: {
       user: true,
-      project: {
-        include: {
-          user: { include: { customize: true } },
-        },
-      },
+      project: true,
     },
   });
 
@@ -33,21 +30,13 @@ async function buildMessages(
     throw new Error("Chat not found");
   }
 
-  const userPreferences = chat.project?.user?.customize
-    ? {
-        tone: chat.project.user.customize.responseTone || "balanced",
-        detailLevel: chat.project.user.customize.knowledgeDetail || "BALANCED",
-        preferredName: chat.project.user.customize.name || chat.project.user.email?.split("@")[0] || "User",
-        interests: chat.project.user.customize.interest || [],
-        firstName: chat.project.user.customize.firstName || "",
-        lastName: chat.project.user.customize.lastName || "",
-      }
-    : { tone: "balanced" as const, detailLevel: "BALANCED" as const, preferredName: "User", interests: [] as string[], firstName: "", lastName: "" };
+  // Get user preferences from cache (much faster than nested query)
+  const userPreferences = await getUserPreferences(chat.userId, chat.user.email);
 
   const promptConfig: PromptConfig = {
     tone: userPreferences.tone as PromptConfig["tone"],
     detailLevel: userPreferences.detailLevel as PromptConfig["detailLevel"],
-    userName: userPreferences.preferredName,
+    userName: userPreferences.name || userPreferences.firstName || userPreferences.email?.split("@")[0] || "User",
     userFirstName: userPreferences.firstName,
     userLastName: userPreferences.lastName,
     userInterests: userPreferences.interests,

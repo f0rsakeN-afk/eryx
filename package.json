@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "npx tsx prisma/seed.ts",
+    "db:push": "bun prisma db push",
+    "db:reset": "bun prisma db push --force-reset"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1029.0",

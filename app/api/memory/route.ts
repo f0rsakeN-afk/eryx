@@ -7,6 +7,8 @@ import {
   deleteMemory,
   getMemoryCategories,
 } from "@/services/memory.service";
+import { checkMemoryLimit, getUserLimits } from "@/services/limit.service";
+import prisma from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,6 +47,42 @@ export async function POST(request: NextRequest) {
 
     if (!content || typeof content !== "string") {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    }
+
+    // Check memory limit
+    const limitCheck = await checkMemoryLimit(user.id);
+    if (!limitCheck.allowed) {
+      const limits = await getUserLimits(user.id);
+
+      // If feature not available at all
+      if (limits.maxMemoryItems === 0) {
+        return NextResponse.json(
+          {
+            error: "Memory feature not available",
+            code: "MEMORY_NOT_AVAILABLE",
+            message: "Upgrade to a paid plan to unlock long-term memory for your AI conversations.",
+            action: "upgrade",
+            upgradeTo: "Basic",
+          },
+          { status: 403 }
+        );
+      }
+
+      // If limit reached
+      return NextResponse.json(
+        {
+          error: "Memory limit reached",
+          code: "MEMORY_LIMIT_REACHED",
+          message: `You've reached your limit of ${limitCheck.limit} memories. Upgrade to store more.`,
+          action: "upgrade",
+          upgradeTo: limits.maxMemoryItems === 20 ? "Pro" : null,
+          limits: {
+            current: limitCheck.current,
+            max: limitCheck.limit,
+          },
+        },
+        { status: 403 }
+      );
     }
 
     const memory = await addMemory(user.id, {

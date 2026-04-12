@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stackServerApp } from "@/src/stack/server";
 import { createMultipartUploadInit, calculateParts, getFileSizeLimit, isContentTypeSupported } from "@/services/s3.service";
 import prisma from "@/lib/prisma";
+import { getUserLimits } from "@/services/limit.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,13 +34,81 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size
+    // Get user's plan limits
+    const limits = await getUserLimits(user.id);
+
+    // Check if attachments feature is available
+    if (limits.maxAttachmentsPerChat === 0) {
+      return NextResponse.json(
+        {
+          error: "File attachments not available",
+          code: "ATTACHMENTS_NOT_AVAILABLE",
+          message: "Upgrade to a paid plan to attach files to your conversations.",
+          action: "upgrade",
+          upgradeTo: "Basic",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Validate file size against user's plan limit
+    const fileSizeMb = fileSize / 1024 / 1024;
+    if (limits.maxFileSizeMb > 0 && fileSizeMb > limits.maxFileSizeMb) {
+      return NextResponse.json(
+        {
+          error: "File too large",
+          code: "FILE_SIZE_EXCEEDED",
+          message: `Maximum file size is ${limits.maxFileSizeMb}MB on your plan.`,
+          action: "upgrade",
+          upgradeTo: limits.maxFileSizeMb === 1 ? "Basic" : limits.maxFileSizeMb === 5 ? "Pro" : null,
+          limits: {
+            maxFileSizeMb: limits.maxFileSizeMb,
+            attempted: Math.round(fileSizeMb * 10) / 10,
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    // Also validate against S3 service limits
     const maxSize = getFileSizeLimit(fileType);
     if (fileSize > maxSize) {
       return NextResponse.json(
         { error: `File too large. Max size for ${fileType}: ${maxSize / 1024 / 1024}MB` },
         { status: 400 }
       );
+    }
+
+    // Check attachment count limit per chat if projectId provided
+    if (projectId) {
+      const chatId = await prisma.chat.findFirst({
+        where: { projectId },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true },
+      });
+
+      if (chatId) {
+        const attachmentCount = await prisma.chatFile.count({
+          where: { chatId: chatId.id },
+        });
+
+        if (limits.maxAttachmentsPerChat !== -1 && attachmentCount >= limits.maxAttachmentsPerChat) {
+          return NextResponse.json(
+            {
+              error: "Attachment limit reached",
+              code: "ATTACHMENT_LIMIT_REACHED",
+              message: `You've reached the maximum of ${limits.maxAttachmentsPerChat} attachments per chat.`,
+              action: "upgrade",
+              upgradeTo: limits.maxAttachmentsPerChat === 3 ? "Basic" : limits.maxAttachmentsPerChat === 5 ? "Pro" : null,
+              limits: {
+                current: attachmentCount,
+                max: limits.maxAttachmentsPerChat,
+              },
+            },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     // Generate file ID

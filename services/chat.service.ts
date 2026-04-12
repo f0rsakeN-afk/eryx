@@ -147,7 +147,14 @@ export async function branchChat(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messageId }),
   });
-  if (!res.ok) throw new Error("Failed to branch chat");
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: "Failed to branch chat" }));
+    const err = new Error(error.error || "Failed to branch chat") as Error & { code?: string; message?: string; upgradeTo?: string };
+    err.code = error.code;
+    err.message = error.message;
+    err.upgradeTo = error.upgradeTo;
+    throw err;
+  }
   return res.json();
 }
 

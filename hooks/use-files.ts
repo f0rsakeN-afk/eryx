@@ -67,8 +67,12 @@ export function useInitUpload() {
         body: JSON.stringify(params),
       });
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to initialize upload");
+        const error = await res.json().catch(() => ({ error: "Failed to initialize upload" }));
+        const err = new Error(error.error || "Failed to initialize upload") as Error & { code?: string; message?: string; upgradeTo?: string };
+        err.code = error.code;
+        err.message = error.message;
+        err.upgradeTo = error.upgradeTo;
+        throw err;
       }
       return res.json();
     },

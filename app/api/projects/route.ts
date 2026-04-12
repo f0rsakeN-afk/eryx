@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getOrCreateUser } from "@/lib/auth";
+import { getUserLimits } from "@/services/limit.service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,8 +61,31 @@ export async function POST(request: NextRequest) {
 
     if (!name || name.length < 2 || name.length > 50) {
       return NextResponse.json(
-        { error: "Name must be 2-50 characters" },
+        { error: "Project name must be 2-50 characters" },
         { status: 400 }
+      );
+    }
+
+    // Check project limit
+    const limits = await getUserLimits(user.id);
+    const projectCount = await prisma.project.count({
+      where: { userId: user.id, archivedAt: null },
+    });
+
+    if (limits.maxProjects !== -1 && projectCount >= limits.maxProjects) {
+      return NextResponse.json(
+        {
+          error: "Project limit reached",
+          code: "PROJECT_LIMIT_REACHED",
+          message: `You've reached the maximum of ${limits.maxProjects} projects on your ${limits.maxProjects === 2 ? "Free" : "current"} plan.`,
+          action: "upgrade",
+          upgradeTo: limits.maxProjects === 2 ? "Basic" : limits.maxProjects === 5 ? "Pro" : null,
+          limits: {
+            current: projectCount,
+            max: limits.maxProjects,
+          },
+        },
+        { status: 403 }
       );
     }
 

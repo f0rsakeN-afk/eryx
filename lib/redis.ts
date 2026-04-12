@@ -61,6 +61,9 @@ export const KEYS = {
   bruteForce: (identifier: string) => `bruteforce:${identifier}`,
   projectContext: (projectId: string) => `project:${projectId}:context`,
   extractionJob: (jobId: string) => `extraction:job:${jobId}`,
+  userPreferences: (userId: string) => `user:${userId}:preferences`,
+  userLimits: (userId: string) => `user:limits:${userId}`,
+  userSettings: (userId: string) => `user:${userId}:settings`,
 } as const;
 
 // TTL constants (in seconds)
@@ -74,6 +77,9 @@ export const TTL = {
   userCache: 5 * 60, // 5 minutes for user cache
   statusHistory: 31 * 24 * 60 * 60, // 31 days for status history
   bruteForce: 5 * 60, // 5 minutes for brute force tracking
+  userPreferences: 30 * 60, // 30 minutes for user preferences/customize
+  userLimits: 5 * 60, // 5 minutes for user limits
+  userSettings: 30 * 60, // 30 minutes for user settings
 } as const;
 
 // Pub/Sub channel helpers
