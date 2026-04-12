@@ -7,6 +7,7 @@ import { buildChatContext } from "@/lib/context-manager";
 import { buildSystemPrompt, type PromptConfig } from "@/lib/prompts";
 import { validateAuth } from "@/lib/auth";
 import { aiConfig } from "@/lib/config";
+import { getUserPreferences } from "@/services/preferences.service";
 
 const groq = new Groq();
 
@@ -21,11 +22,7 @@ async function buildMessages(
     where: { id: chatId },
     include: {
       user: true,
-      project: {
-        include: {
-          user: { include: { customize: true } },
-        },
-      },
+      project: true,
     },
   });
 
@@ -33,17 +30,16 @@ async function buildMessages(
     throw new Error("Chat not found");
   }
 
-  const userPreferences = chat.project?.user?.customize
-    ? {
-        tone: chat.project.user.customize.responseTone || "balanced",
-        detailLevel: chat.project.user.customize.knowledgeDetail || "BALANCED",
-      }
-    : { tone: "balanced" as const, detailLevel: "BALANCED" as const };
+  // Get user preferences from cache (much faster than nested query)
+  const userPreferences = await getUserPreferences(chat.userId, chat.user.email);
 
   const promptConfig: PromptConfig = {
     tone: userPreferences.tone as PromptConfig["tone"],
     detailLevel: userPreferences.detailLevel as PromptConfig["detailLevel"],
-    userName: chat.project?.user?.email?.split("@")[0] || "User",
+    userName: userPreferences.name || userPreferences.firstName || userPreferences.email?.split("@")[0] || "User",
+    userFirstName: userPreferences.firstName,
+    userLastName: userPreferences.lastName,
+    userInterests: userPreferences.interests,
     projectName: chat.project?.name,
     projectInstruction: chat.project?.instruction || undefined,
   };
@@ -114,6 +110,34 @@ export async function POST(req: NextRequest) {
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    // Check credits before processing
+    const { checkCreditsForOperation, deductCredits } = await import("@/services/credit.service");
+    const { stripeConfig } = await import("@/lib/stripe-config");
+
+    // Determine cost based on model
+    const model = aiConfig.model as keyof typeof stripeConfig.creditCosts;
+    const cost = stripeConfig.creditCosts[model] || 1;
+
+    // Check if user has enough credits
+    const hasCredits = await checkCreditsForOperation(user.id, model);
+    if (!hasCredits) {
+      // Get current balance
+      const { getUserCredits } = await import("@/services/credit.service");
+      const balance = await getUserCredits(user.id);
+      return new Response(JSON.stringify({
+        error: "Insufficient credits",
+        required: cost,
+        current: balance,
+        message: `This operation requires ${cost} credits. You have ${balance} credits remaining.`,
+      }), {
+        status: 402,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Deduct credits (will be refunded if operation fails)
+    const deduction = await deductCredits(user.id, model);
 
     // Build messages with optimized context
     const fullMessages = await buildMessages(chatId, messages);

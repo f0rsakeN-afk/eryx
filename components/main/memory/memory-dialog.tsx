@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, Trash2, Calendar, Loader2, Check, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { MemoryItem } from '@/services/memory.service';
 
@@ -68,12 +69,27 @@ export function MemoryDialog({
     e.preventDefault();
     if (!newMemory.content.trim()) return;
 
-    addMemory({
-      title: newMemory.title || newMemory.content.slice(0, 50),
-      content: newMemory.content,
-    });
-    setNewMemory({ title: '', content: '' });
-    setIsAdding(false);
+    try {
+      await addMemory({
+        title: newMemory.title || newMemory.content.slice(0, 50),
+        content: newMemory.content,
+      });
+      setNewMemory({ title: '', content: '' });
+      setIsAdding(false);
+    } catch (error) {
+      const err = error as { code?: string; message?: string; upgradeTo?: string };
+      if (err.code === 'MEMORY_LIMIT_REACHED' || err.code === 'MEMORY_NOT_AVAILABLE') {
+        toast.error(err.message || 'Memory limit reached', {
+          description: err.upgradeTo ? `Upgrade to ${err.upgradeTo} for more memories` : undefined,
+          action: err.upgradeTo ? {
+            label: `Upgrade to ${err.upgradeTo}`,
+            onClick: () => window.dispatchEvent(new CustomEvent('open-pricing-dialog')),
+          } : undefined,
+        });
+      } else {
+        toast.error('Failed to add memory. Please try again.');
+      }
+    }
   };
 
   const toggleMemorySelection = (memoryId: string) => {

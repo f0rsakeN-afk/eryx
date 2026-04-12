@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, FolderPlus } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -48,7 +49,22 @@ export default function CreateProjectDialog({
       reset();
       onClose(false);
     } catch (error) {
-      console.error("Failed to create project:", error);
+      const err = error as { code?: string; message?: string; upgradeTo?: string };
+      if (err.code === "PROJECT_LIMIT_REACHED") {
+        toast.error(err.message || "Project limit reached", {
+          description: err.upgradeTo ? `Upgrade to ${err.upgradeTo} for more projects` : undefined,
+          action: err.upgradeTo ? {
+            label: `Upgrade to ${err.upgradeTo}`,
+            onClick: () => {
+              // Open pricing dialog - emit event or use a callback
+              onClose(false);
+              window.dispatchEvent(new CustomEvent("open-pricing-dialog"));
+            },
+          } : undefined,
+        });
+      } else {
+        toast.error("Failed to create project. Please try again.");
+      }
     }
   };
 

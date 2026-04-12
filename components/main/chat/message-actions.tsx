@@ -2,6 +2,7 @@
 
 import { memo, useState, useCallback, useEffect, useRef } from "react";
 import { Copy, Check, Volume2, Pause, ThumbsUp, ThumbsDown, GitBranch, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -221,7 +222,18 @@ export const MessageActions = memo(function MessageActions({
       const res = await branchChat(chatId, messageId);
       window.location.href = `/chat/${res.newChatId}`;
     } catch (err) {
-      console.error("Failed to branch chat:", err);
+      const error = err as { code?: string; message?: string; upgradeTo?: string };
+      if (error.code === "BRANCH_LIMIT_REACHED" || error.code === "BRANCH_NOT_AVAILABLE") {
+        toast.error(error.message || "Branch limit reached", {
+          description: error.upgradeTo ? `Upgrade to ${error.upgradeTo} for more branches` : undefined,
+          action: error.upgradeTo ? {
+            label: `Upgrade to ${error.upgradeTo}`,
+            onClick: () => window.dispatchEvent(new CustomEvent("open-pricing-dialog")),
+          } : undefined,
+        });
+      } else {
+        toast.error("Failed to branch chat. Please try again.");
+      }
       setIsBranching(false);
     }
   }, [messageId, chatId]);
