@@ -256,8 +256,43 @@ CREATE TABLE "Memory" (
 -- CreateTable
 CREATE TABLE "OnboardingData" (
     "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "profession" TEXT NOT NULL,
+    "source" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "OnboardingData_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Notification" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "read" BOOLEAN NOT NULL DEFAULT false,
+    "archived" BOOLEAN NOT NULL DEFAULT false,
+    "snoozedUntil" TIMESTAMP(3),
+    "accent" TEXT NOT NULL DEFAULT 'bg-blue-400',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "NotificationPrefs" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "newFeature" BOOLEAN NOT NULL DEFAULT true,
+    "credits" BOOLEAN NOT NULL DEFAULT true,
+    "system" BOOLEAN NOT NULL DEFAULT false,
+    "tips" BOOLEAN NOT NULL DEFAULT true,
+    "security" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "NotificationPrefs_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -433,6 +468,24 @@ CREATE INDEX "Memory_userId_category_idx" ON "Memory"("userId", "category");
 CREATE INDEX "Memory_createdAt_idx" ON "Memory"("createdAt");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "OnboardingData_userId_key" ON "OnboardingData"("userId");
+
+-- CreateIndex
+CREATE INDEX "OnboardingData_userId_idx" ON "OnboardingData"("userId");
+
+-- CreateIndex
+CREATE INDEX "Notification_userId_idx" ON "Notification"("userId");
+
+-- CreateIndex
+CREATE INDEX "Notification_userId_read_archived_idx" ON "Notification"("userId", "read", "archived");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "NotificationPrefs_userId_key" ON "NotificationPrefs"("userId");
+
+-- CreateIndex
+CREATE INDEX "NotificationPrefs_userId_idx" ON "NotificationPrefs"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Plan_tier_key" ON "Plan"("tier");
 
 -- CreateIndex
@@ -515,6 +568,12 @@ ALTER TABLE "Customize" ADD CONSTRAINT "Customize_userId_fkey" FOREIGN KEY ("use
 
 -- AddForeignKey
 ALTER TABLE "Settings" ADD CONSTRAINT "Settings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificationPrefs" ADD CONSTRAINT "NotificationPrefs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

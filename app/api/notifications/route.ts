@@ -6,15 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { stackServerApp } from "@/src/stack/server";
+import { getOrCreateUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await stackServerApp.getUser({ tokenStore: request });
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await getOrCreateUser(request);
 
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get("filter") || "all";
@@ -87,10 +84,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await stackServerApp.getUser({ tokenStore: request });
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await getOrCreateUser(request);
 
     const body = await request.json();
 
@@ -163,10 +157,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await stackServerApp.getUser({ tokenStore: request });
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await getOrCreateUser(request);
 
     const body = await request.json();
 
