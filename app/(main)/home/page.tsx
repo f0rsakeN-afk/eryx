@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChatInput } from "@/components/main/home/chat-input";
@@ -23,6 +23,28 @@ export default function HomePage() {
   );
   const [activeChip, setActiveChip] = useState<ChipData | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check auth and onboarding status on mount
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/auth/status");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && !data.seenOnboarding) {
+            router.push("/onboarding");
+            return;
+          }
+        }
+      } catch {
+        // Auth check failed, let user continue
+      } finally {
+        setAuthChecked(true);
+      }
+    }
+    checkAuth();
+  }, [router]);
 
   const handleSubmit = useCallback(
     async (value: string) => {
@@ -82,6 +104,18 @@ export default function HomePage() {
   }, []);
 
   const handleModalClose = useCallback(() => setActiveChip(null), []);
+
+  // Show loading while checking auth
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-full min-h-[calc(100dvh-3rem)] flex-col bg-background md:min-h-dvh">

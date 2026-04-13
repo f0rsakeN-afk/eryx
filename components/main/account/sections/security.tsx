@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Lock, Trash2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { Lock, Trash2, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -17,11 +20,43 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export const SecuritySection = React.memo(function SecuritySection() {
-  const [twoFactor, setTwoFactor] = React.useState(false);
-  const [deleteAccountOpen, setDeleteAccountOpen] = React.useState(false);
+interface AccountData {
+  profile: {
+    isActive: boolean;
+  };
+}
 
-  const openDeleteAccount  = React.useCallback(() => setDeleteAccountOpen(true), []);
+async function fetchAccount(): Promise<AccountData> {
+  const res = await fetch("/api/account");
+  if (!res.ok) throw new Error("Failed to fetch account");
+  return res.json();
+}
+
+async function deleteAccount(): Promise<void> {
+  const res = await fetch("/api/account", {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete account");
+}
+
+export const SecuritySection = React.memo(function SecuritySection() {
+  const router = useRouter();
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteAccount,
+    onSuccess: () => {
+      toast.success("Account deactivated. We're sorry to see you go.");
+      setDeleteDialogOpen(false);
+      // Redirect to home or show deactivated page
+      setTimeout(() => {
+        router.push("/home");
+      }, 1000);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to delete account");
+    },
+  });
 
   return (
     <div className="space-y-5">
@@ -34,7 +69,7 @@ export const SecuritySection = React.memo(function SecuritySection() {
         </p>
       </div>
 
-      {/* Two-factor authentication */}
+      {/* Two-factor authentication - managed via StackAuth */}
       <div className="space-y-1.5">
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
           Two-factor authentication
@@ -47,68 +82,89 @@ export const SecuritySection = React.memo(function SecuritySection() {
                 Two-factor authentication
               </p>
               <p className="text-[12px] text-muted-foreground mt-0.5">
-                Add an extra layer of security
+                Managed via{" "}
+                <a
+                  href="https://app.stackauth.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  StackAuth.com
+                </a>
               </p>
             </div>
           </div>
-          <Switch
-            checked={twoFactor}
-            onCheckedChange={setTwoFactor}
+          <Button
+            variant="outline"
             size="sm"
-          />
+            className="h-7 text-[12px] shrink-0"
+            onClick={() => window.open("https://app.stackauth.com", "_blank")}
+          >
+            Manage
+          </Button>
         </div>
       </div>
 
-      {/* Active sessions */}
+      {/* Active sessions - managed via StackAuth */}
       <div className="space-y-1.5">
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
           Active sessions
         </p>
-        <div className="rounded-lg border border-border/60 bg-muted/20 px-3 divide-y divide-border/40">
-          {/* Current session */}
-          <div className="flex items-center justify-between gap-4 py-3">
+        <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-3">
+          <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[13px] font-medium text-foreground">
-                  Chrome · macOS
-                </span>
-                <span className="inline-flex items-center rounded-full bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-600 dark:text-green-400">
-                  Current session
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                192.168.1.1
+              <p className="text-[13px] font-medium text-foreground">
+                Session management
               </p>
-            </div>
-          </div>
-
-          {/* Other session */}
-          <div className="flex items-center justify-between gap-4 py-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] font-medium text-foreground">
-                  Safari · iPhone
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  2 days ago
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                10.0.0.4
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                Managed via{" "}
+                <a
+                  href="https://app.stackauth.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  StackAuth.com
+                </a>
               </p>
             </div>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 text-[12px] text-destructive hover:text-destructive shrink-0"
+              className="h-7 text-[12px] shrink-0"
+              onClick={() => window.open("https://app.stackauth.com", "_blank")}
             >
-              Revoke
+              Manage
             </Button>
           </div>
         </div>
       </div>
 
-      <AlertDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen}>
+      {/* Danger zone */}
+      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-2.5">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-foreground">
+              Delete account
+            </p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
+              Permanently deactivate your account. Your data will be retained for
+              30 days before permanent deletion. Contact support to restore.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-[12px] border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
+          onClick={() => setDeleteDialogOpen(true)}
+        >
+          Delete account
+        </Button>
+      </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogMedia className="bg-destructive/10">
@@ -116,8 +172,9 @@ export const SecuritySection = React.memo(function SecuritySection() {
             </AlertDialogMedia>
             <AlertDialogTitle>Delete your account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete your account, all chats, projects, and
-              associated data. This action cannot be undone.
+              This will permanently deactivate your account. Your data will be
+              retained for 30 days before permanent deletion. Contact support
+              to restore your account within this period.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -125,34 +182,14 @@ export const SecuritySection = React.memo(function SecuritySection() {
             <AlertDialogAction
               className="text-white"
               render={<Button variant="destructive" />}
-              onClick={() => setDeleteAccountOpen(false)}
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
             >
-              Delete account
+              {deleteMutation.isPending ? "Deactivating..." : "Delete account"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Danger zone */}
-      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-2.5">
-        <div>
-          <p className="text-[13px] font-semibold text-foreground">
-            Delete account
-          </p>
-          <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">
-            Permanently delete your account and all associated data. This cannot
-            be undone.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-[12px] border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
-          onClick={openDeleteAccount}
-        >
-          Delete account
-        </Button>
-      </div>
     </div>
   );
 });

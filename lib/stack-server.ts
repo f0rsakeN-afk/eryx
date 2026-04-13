@@ -99,6 +99,55 @@ export async function getUserChats(
   return result;
 }
 
+export async function searchUserChats(
+  userId: string,
+  query: string,
+  limit = 20
+) {
+  if (!query.trim()) {
+    return { chats: [], nextCursor: null };
+  }
+
+  const searchTerm = `%${query.toLowerCase()}%`;
+
+  // Search in chat titles
+  const chats = await prisma.chat.findMany({
+    where: {
+      userId,
+      archivedAt: null,
+      OR: [
+        { title: { contains: query, mode: "insensitive" } },
+        { messages: { some: { content: { contains: query, mode: "insensitive" } } } },
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+    take: limit,
+    include: {
+      messages: {
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        select: { content: true },
+      },
+      _count: {
+        select: { messages: true },
+      },
+    },
+  });
+
+  return {
+    chats: chats.map((chat: typeof chats[number]) => ({
+      id: chat.id,
+      title: chat.title,
+      createdAt: chat.createdAt.toISOString(),
+      updatedAt: chat.updatedAt.toISOString(),
+      projectId: chat.projectId,
+      messageCount: chat._count.messages,
+      firstMessagePreview: chat.messages[0]?.content.slice(0, 100) || null,
+    })),
+    nextCursor: null,
+  };
+}
+
 export async function createChat(
   userId: string,
   options: { projectId?: string; firstMessage?: string } = {}
