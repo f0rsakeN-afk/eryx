@@ -64,6 +64,7 @@ export const KEYS = {
   userPreferences: (userId: string) => `user:${userId}:preferences`,
   userLimits: (userId: string) => `user:limits:${userId}`,
   userSettings: (userId: string) => `user:${userId}:settings`,
+  searchResults: (query: string) => `search:${Buffer.from(query).toString("base64").slice(0, 32)}`,
 } as const;
 
 // TTL constants (in seconds)
@@ -80,6 +81,7 @@ export const TTL = {
   userPreferences: 30 * 60, // 30 minutes for user preferences/customize
   userLimits: 5 * 60, // 5 minutes for user limits
   userSettings: 30 * 60, // 30 minutes for user settings
+  searchResults: 60 * 60, // 1 hour for web search results
 } as const;
 
 // Pub/Sub channel helpers
