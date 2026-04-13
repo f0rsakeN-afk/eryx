@@ -18,13 +18,14 @@ export async function GET(request: NextRequest) {
 
     const dbUser = await prisma.user.findUnique({
       where: { stackId: user.id },
-      select: { seenOnboarding: true, email: true },
+      select: { seenOnboarding: true, email: true, isActive: true },
     });
 
     return NextResponse.json({
       authenticated: true,
       email: user.primaryEmail,
       seenOnboarding: dbUser?.seenOnboarding ?? false,
+      isActive: dbUser?.isActive ?? true,
     });
   } catch (error) {
     console.error("Auth status error:", error);

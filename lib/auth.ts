@@ -13,6 +13,13 @@ export interface AuthenticatedUser {
   stackId: string;
 }
 
+export class AccountDeactivatedError extends Error {
+  constructor() {
+    super("ACCOUNT_DEACTIVATED");
+    this.name = "AccountDeactivatedError";
+  }
+}
+
 /**
  * Validate auth via Stack Auth and get/create user
  * Use this in API routes - handles full auth flow
@@ -57,6 +64,11 @@ export async function getOrCreateUser(request: Request): Promise<AuthenticatedUs
   // This should never happen if code is correct, but TypeScript doesn't know that
   if (!user) {
     throw new Error("User not found after upsert");
+  }
+
+  // Check if account is deactivated
+  if (!user.isActive) {
+    throw new AccountDeactivatedError();
   }
 
   // Update cache
@@ -108,11 +120,16 @@ export async function validateAuth(request: Request): Promise<AuthenticatedUser 
     // Look up in DB
     const user = await prisma.user.findUnique({
       where: { stackId: stackUser.id },
-      select: { id: true, email: true },
+      select: { id: true, email: true, isActive: true },
     });
 
     if (!user) {
       return null;
+    }
+
+    // Check if account is deactivated
+    if (!user.isActive) {
+      throw new AccountDeactivatedError();
     }
 
     // Cache for future

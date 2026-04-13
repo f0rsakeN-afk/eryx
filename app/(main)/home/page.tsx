@@ -36,6 +36,10 @@ export default function HomePage() {
             router.push("/onboarding");
             return;
           }
+          if (data.authenticated && data.isActive === false) {
+            router.push("/deactivated");
+            return;
+          }
         }
       } catch {
         // Auth check failed, let user continue

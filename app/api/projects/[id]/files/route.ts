@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getOrCreateUser } from "@/lib/auth";
+import { getOrCreateUser, AccountDeactivatedError } from "@/lib/auth";
 import { invalidateProjectContext } from "@/services/project-context.service";
 
 export async function GET(
@@ -44,6 +44,9 @@ export async function GET(
 
     return NextResponse.json({ files });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -105,6 +108,9 @@ export async function POST(
 
     return NextResponse.json({ file: updatedFile });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
