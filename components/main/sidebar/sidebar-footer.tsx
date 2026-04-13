@@ -18,6 +18,7 @@ import {
   UserCircle,
   Keyboard,
   LogIn,
+  Bug,
 } from "lucide-react";
 
 import {
@@ -43,6 +44,7 @@ import { LogoutDialog } from "./dialogs/auth/logout-dialog";
 import { SettingsDialog } from "@/components/main/settings/settings-dialog";
 import { AccountDialog } from "@/components/main/account/account-dialog";
 import { ShortcutsDialog } from "@/components/main/sidebar/dialogs/shortcuts-dialog";
+import { ReportDialog } from "@/components/report/report-dialog";
 import { useKeyboardShortcut } from "@/hooks/use-keyboard-shortcut";
 import { useStackApp, useUser } from "@stackframe/stack";
 import { useQuery } from "@tanstack/react-query";
@@ -61,6 +63,7 @@ export function AppSidebarFooter() {
   const [settingsOpen, setSettingsOpen] = React.useState<boolean>(false);
   const [accountOpen, setAccountOpen] = React.useState<boolean>(false);
   const [shortcutsOpen, setShortcutsOpen] = React.useState<boolean>(false);
+  const [reportOpen, setReportOpen] = React.useState<boolean>(false);
   const isCollapsed = state === "collapsed";
 
   // Fetch user plan info
@@ -87,6 +90,7 @@ export function AppSidebarFooter() {
   const openFeedback = React.useCallback(() => setFeedbackOpen(true), []);
   const openLogout = React.useCallback(() => setLogoutAlertOpen(true), []);
   const openShortcuts = React.useCallback(() => setShortcutsOpen(true), []);
+  const openReport = React.useCallback(() => setReportOpen(true), []);
 
   // ── Global keyboard shortcuts ──────────────────────────────────────────
   useKeyboardShortcut(",", openSettings, {
@@ -300,6 +304,13 @@ export function AppSidebarFooter() {
                   <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
                   Send Feedback
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2.5 text-[13px] cursor-pointer"
+                  onClick={openReport}
+                >
+                  <Bug className="h-3.5 w-3.5 text-muted-foreground" />
+                  Report Issue
+                </DropdownMenuItem>
               </DropdownMenuGroup>
 
               <DropdownMenuSeparator />
@@ -327,6 +338,7 @@ export function AppSidebarFooter() {
       <SettingsDialog isOpen={settingsOpen} onOpenChange={setSettingsOpen} />
       <FeedbackDialog isOpen={feedbackOpen} onOpenChange={setFeedbackOpen} />
       <CustomizeDialog isOpen={customizeOpen} onOpenChange={setCustomizeOpen} />
+      <ReportDialog isOpen={reportOpen} onOpenChange={setReportOpen} />
     </>
   );
 }

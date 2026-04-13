@@ -51,9 +51,16 @@ export function FeedbackDialog({ isOpen, onOpenChange }: FeedbackDialogProps) {
   const onSubmit = async (data: FeedbackSchema) => {
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      console.log("Feedback submitted:", data);
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to submit feedback");
+      }
+
       toast.success("Thank you for your feedback!");
 
       // Reset and close

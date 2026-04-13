@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -29,10 +30,60 @@ function SettingRow({
   );
 }
 
+interface Settings {
+  analytics: boolean;
+  usageData: boolean;
+  crashReports: boolean;
+}
+
+async function fetchSettings(): Promise<Settings> {
+  const res = await fetch("/api/settings");
+  if (!res.ok) throw new Error("Failed to fetch settings");
+  return res.json();
+}
+
+async function updateSetting(key: string, value: boolean): Promise<Settings> {
+  const res = await fetch("/api/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ [key]: value }),
+  });
+  if (!res.ok) throw new Error("Failed to update settings");
+  return res.json();
+}
+
 export function PrivacySection() {
-  const [analytics, setAnalytics] = React.useState(true);
-  const [usageData, setUsageData] = React.useState(false);
-  const [crashReports, setCrashReports] = React.useState(true);
+  const queryClient = useQueryClient();
+  const [localSettings, setLocalSettings] = React.useState<Settings | null>(null);
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ["settings"],
+    queryFn: fetchSettings,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
+      return updateSetting(key, value);
+    },
+    onSuccess: (newData) => {
+      queryClient.setQueryData(["settings"], newData);
+      setLocalSettings(newData);
+    },
+  });
+
+  const onUpdate = React.useCallback((key: keyof Settings, value: boolean) => {
+    mutation.mutate({ key, value });
+  }, [mutation]);
+
+  const displaySettings = localSettings || settings;
+
+  if (isLoading || !displaySettings) {
+    return (
+      <div className="space-y-5">
+        <div className="h-20 rounded-lg bg-muted/20 animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -55,8 +106,8 @@ export function PrivacySection() {
             description="Help us understand how you use Eryx to improve the product."
           >
             <Switch
-              checked={analytics}
-              onCheckedChange={setAnalytics}
+              checked={displaySettings.analytics}
+              onCheckedChange={(val) => onUpdate("analytics", val)}
               size="sm"
             />
           </SettingRow>
@@ -65,8 +116,8 @@ export function PrivacySection() {
             description="Allow anonymized conversation data to improve AI models."
           >
             <Switch
-              checked={usageData}
-              onCheckedChange={setUsageData}
+              checked={displaySettings.usageData}
+              onCheckedChange={(val) => onUpdate("usageData", val)}
               size="sm"
             />
           </SettingRow>
@@ -75,8 +126,8 @@ export function PrivacySection() {
             description="Automatically send error reports when something goes wrong."
           >
             <Switch
-              checked={crashReports}
-              onCheckedChange={setCrashReports}
+              checked={displaySettings.crashReports}
+              onCheckedChange={(val) => onUpdate("crashReports", val)}
               size="sm"
             />
           </SettingRow>
