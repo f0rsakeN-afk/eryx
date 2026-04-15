@@ -160,7 +160,7 @@ export async function summarizeChat(chatId: string): Promise<boolean> {
       }
 
       // Get all messages from last summary point to now
-      messagesToSummarize = await prisma.message.findMany({
+      const dbMessages = await prisma.message.findMany({
         where: {
           chatId,
           createdAt: { gte: lastMsg.createdAt },
@@ -168,6 +168,12 @@ export async function summarizeChat(chatId: string): Promise<boolean> {
         orderBy: { createdAt: "asc" },
         take: 100, // Cap at 100 messages per summary
       });
+      messagesToSummarize = dbMessages.map(m => ({
+        id: m.id,
+        role: (m.role || "assistant") as string,
+        content: m.content,
+        createdAt: m.createdAt,
+      }));
 
       if (messagesToSummarize.length < 10) return true;
 
@@ -175,11 +181,17 @@ export async function summarizeChat(chatId: string): Promise<boolean> {
       endMsgId = messagesToSummarize[messagesToSummarize.length - 1].id;
     } else {
       // First summary - get first 100 messages
-      messagesToSummarize = await prisma.message.findMany({
+      const dbMessages = await prisma.message.findMany({
         where: { chatId },
         orderBy: { createdAt: "asc" },
         take: 100,
       });
+      messagesToSummarize = dbMessages.map(m => ({
+        id: m.id,
+        role: (m.role || "assistant") as string,
+        content: m.content,
+        createdAt: m.createdAt,
+      }));
 
       if (messagesToSummarize.length < 10) return true;
 
@@ -217,8 +229,8 @@ export async function summarizeChat(chatId: string): Promise<boolean> {
           summary: result.summary,
           topics: result.topics,
           keyFacts: result.keyFacts,
-          startMessageId,
-          endMessageId,
+          startMessageId: startMsgId,
+          endMessageId: endMsgId,
           messageCount: messagesToSummarize.length,
           tokenCount,
         },

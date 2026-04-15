@@ -41,8 +41,15 @@ export async function GET(request: NextRequest) {
 
       if (subscription && subscription.status === "ACTIVE") {
         currentPlan = subscription.plan.tier.toLowerCase();
-      } else if (user.planTier) {
-        currentPlan = user.planTier.toLowerCase();
+      } else {
+        // Check user's default plan from database if no active subscription
+        const userRecord = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { planTier: true },
+        });
+        if (userRecord?.planTier) {
+          currentPlan = userRecord.planTier.toLowerCase();
+        }
       }
     }
 

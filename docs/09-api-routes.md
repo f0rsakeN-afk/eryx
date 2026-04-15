@@ -252,14 +252,14 @@ NextResponse.json({ error: "Internal server error" }, { status: 500 });
 | `POST /api/chats` | `chat` | 60/min |
 | `POST /api/chat` | `chat` | 60/min |
 | `GET /api/search` | `search` | 30/min |
-| `POST /api/stripe/*` | `auth` | 10/5min |
+| `POST /api/polar/*` | `auth` | 10/5min |
 
 ## Authentication
 
 All routes except these allow optional authentication:
 - `GET /api/search` - Anonymous search allowed
 - `GET /api/health` - Public health check
-- `POST /api/stripe/webhook` - Stripe signature verification
+- `POST /api/polar/webhook` - Polar signature verification
 - `POST /api/auth/*` - Auth endpoints
 
 For routes with optional auth, use `validateAuth()` which returns `null` if not authenticated.

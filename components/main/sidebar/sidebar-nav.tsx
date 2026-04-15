@@ -62,15 +62,15 @@ const NAV_ITEMS: NavItem[] = [
     comingSoon: false,
     authOnly: true,
   },
-  // {
-  //   id: "files",
-  //   label: "Files",
-  //   icon: FolderOpen,
-  //   href: "/files",
-  //   primary: false,
-  //   comingSoon: false,
-  //   authOnly: true,
-  // },
+  {
+    id: "files",
+    label: "Files",
+    icon: FolderOpen,
+    href: "/files",
+    primary: false,
+    comingSoon: false,
+    authOnly: true,
+  },
 
 ];
 

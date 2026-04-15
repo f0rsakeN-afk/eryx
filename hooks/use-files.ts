@@ -51,7 +51,7 @@ export function useProjectFiles(projectId: string | undefined) {
 /**
  * Initialize multipart upload
  */
-export function useInitUpload() {
+export function useInitUpload(projectId?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -77,7 +77,12 @@ export function useInitUpload() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["project-files"] });
+      // Invalidate project files if projectId is provided
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["project-files", projectId] });
+      }
+      // Always invalidate the global files list
+      queryClient.invalidateQueries({ queryKey: ["files"] });
     },
   });
 }
@@ -105,7 +110,7 @@ export function useGetPresignedUrls() {
 /**
  * Complete multipart upload
  */
-export function useCompleteUpload() {
+export function useCompleteUpload(projectId?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -127,7 +132,12 @@ export function useCompleteUpload() {
       return res.json();
     },
     onSuccess: (data, variables, context) => {
-      queryClient.invalidateQueries({ queryKey: ["project-files"] });
+      // Invalidate project files if projectId is provided
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["project-files", projectId] });
+      }
+      // Always invalidate the global files list
+      queryClient.invalidateQueries({ queryKey: ["files"] });
     },
   });
 }
@@ -137,9 +147,9 @@ export function useCompleteUpload() {
  * Returns upload progress
  */
 export function useUploadFile(projectId: string | undefined) {
-  const initUpload = useInitUpload();
+  const initUpload = useInitUpload(projectId);
   const getPresigned = useGetPresignedUrls();
-  const completeUpload = useCompleteUpload();
+  const completeUpload = useCompleteUpload(projectId);
 
   const uploadFile = async (file: File): Promise<ProjectFile> => {
     // 1. Initialize upload
@@ -199,4 +209,52 @@ export function useUploadFile(projectId: string | undefined) {
     isUploading: initUpload.isPending || getPresigned.isPending || completeUpload.isPending,
     error: initUpload.error || getPresigned.error || completeUpload.error,
   };
+}
+
+/**
+ * Remove file from project
+ */
+export function useDeleteProjectFile(projectId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (fileId: string): Promise<{ success: boolean }> => {
+      if (!projectId) throw new Error("No projectId");
+      const res = await fetch(`/api/projects/${projectId}/files?fileId=${fileId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: "Failed to delete file" }));
+        throw new Error(error.error || "Failed to delete file");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-files", projectId] });
+    },
+  });
+}
+
+/**
+ * Delete file completely (from all contexts)
+ */
+export function useDeleteFile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (fileId: string): Promise<{ success: boolean; warning?: string }> => {
+      const res = await fetch(`/api/files/${fileId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: "Failed to delete file" }));
+        throw new Error(error.error || "Failed to delete file");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["project-files"] });
+    },
+  });
 }

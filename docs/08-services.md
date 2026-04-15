@@ -180,7 +180,7 @@ creditCosts: {
 
 ```typescript
 async function deductCredits(userId, operation, customAmount?) {
-  const cost = customAmount ?? stripeConfig.creditCosts[operation] ?? 1;
+  const cost = customAmount ?? polarConfig.creditCosts[operation] ?? 1;
 
   // Check balance
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -324,8 +324,8 @@ interface PlanData {
   name: string;
   description: string;
   price: number;
-  stripePriceId: string | null;
-  stripeProductId: string | null;
+  polarPriceId: string | null;
+  polarProductId: string | null;
   credits: number;
   maxChats: number;
   maxProjects: number;

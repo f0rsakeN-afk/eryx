@@ -82,7 +82,30 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
       if (sub.currentPeriodEnd > now || sub.cancelAtPeriodEnd) {
         // Subscription is active
         isActiveSubscription = true;
-        effectivePlan = user.userPlan;
+        // Transform Prisma Plan to PlanData (add polarProductId field)
+        effectivePlan = user.userPlan ? {
+          id: user.userPlan.id,
+          tier: user.userPlan.tier,
+          name: user.userPlan.name,
+          description: user.userPlan.description,
+          price: user.userPlan.price,
+          polarPriceId: user.userPlan.polarPriceId,
+          polarProductId: user.userPlan.polarProductId,
+          credits: user.userPlan.credits,
+          maxChats: user.userPlan.maxChats,
+          maxProjects: user.userPlan.maxProjects,
+          maxMessages: user.userPlan.maxMessages,
+          maxMemoryItems: user.userPlan.maxMemoryItems,
+          maxBranchesPerChat: user.userPlan.maxBranchesPerChat,
+          maxFolders: user.userPlan.maxFolders,
+          maxAttachmentsPerChat: user.userPlan.maxAttachmentsPerChat,
+          maxFileSizeMb: user.userPlan.maxFileSizeMb,
+          canExport: user.userPlan.canExport,
+          canApiAccess: user.userPlan.canApiAccess,
+          features: user.userPlan.features,
+          isActive: user.userPlan.isActive,
+          isVisible: user.userPlan.isVisible,
+        } : null;
       }
     }
   }
@@ -91,7 +114,30 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
   if (!effectivePlan) {
     if (user?.userPlan && user.credits > 0) {
       // User has credits remaining from their plan, keep using it
-      effectivePlan = user.userPlan;
+      // Transform Prisma Plan to PlanData
+      effectivePlan = {
+        id: user.userPlan.id,
+        tier: user.userPlan.tier,
+        name: user.userPlan.name,
+        description: user.userPlan.description,
+        price: user.userPlan.price,
+        polarPriceId: user.userPlan.polarPriceId,
+        polarProductId: user.userPlan.polarProductId,
+        credits: user.userPlan.credits,
+        maxChats: user.userPlan.maxChats,
+        maxProjects: user.userPlan.maxProjects,
+        maxMessages: user.userPlan.maxMessages,
+        maxMemoryItems: user.userPlan.maxMemoryItems,
+        maxBranchesPerChat: user.userPlan.maxBranchesPerChat,
+        maxFolders: user.userPlan.maxFolders,
+        maxAttachmentsPerChat: user.userPlan.maxAttachmentsPerChat,
+        maxFileSizeMb: user.userPlan.maxFileSizeMb,
+        canExport: user.userPlan.canExport,
+        canApiAccess: user.userPlan.canApiAccess,
+        features: user.userPlan.features,
+        isActive: user.userPlan.isActive,
+        isVisible: user.userPlan.isVisible,
+      };
     } else {
       // Fall back to free tier
       effectivePlan = await getPlan("free");
@@ -132,8 +178,8 @@ function buildUserLimits(plan: PlanData | null): UserLimits {
     name: "Free",
     description: "",
     price: 0,
-    stripePriceId: null,
-    stripeProductId: null,
+    polarPriceId: null,
+    polarProductId: null,
     credits: 25,
     maxChats: 100,
     maxProjects: 2,

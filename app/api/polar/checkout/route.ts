@@ -51,14 +51,17 @@ async function createSubscriptionCheckout(userId: string, planId: string) {
     return NextResponse.json({ error: "Plan not found" }, { status: 404 });
   }
 
-  if (!plan.polarProductId) {
+  // Get polarProductId from polar-config based on plan tier (lowercase)
+  const tierKey = plan.tier.toLowerCase() as keyof typeof polarConfig.plans;
+  const polarProductId = polarConfig.plans[tierKey]?.polarProductId;
+  if (!polarProductId) {
     return NextResponse.json({ error: "Plan not configured for Polar" }, { status: 400 });
   }
 
   // Create Polar checkout URL
   // Polar checkout links can be created via API or pre-created in dashboard
   // Here we use a pre-created checkout link with metadata
-  const checkoutUrl = new URL(`https://polar.sh/checkout/${plan.polarProductId}`);
+  const checkoutUrl = new URL(`https://polar.sh/checkout/${polarProductId}`);
 
   // Add metadata for webhook identification
   checkoutUrl.searchParams.set("metadata[userId]", userId);

@@ -8,6 +8,7 @@ import {
   getMemoryCategories,
 } from "@/services/memory.service";
 import { checkMemoryLimit, getUserLimits } from "@/services/limit.service";
+import { createMemoryEmbeddings, deleteMemoryEmbeddings } from "@/lib/stack-server";
 import prisma from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
@@ -93,6 +94,9 @@ export async function POST(request: NextRequest) {
       metadata,
     });
 
+    // Create embeddings for RAG
+    await createMemoryEmbeddings(memory.id, content);
+
     return NextResponse.json(memory);
   } catch (error) {
     console.error("Memory POST error:", error);
@@ -113,6 +117,9 @@ export async function DELETE(request: NextRequest) {
     if (!memoryId) {
       return NextResponse.json({ error: "Memory ID required" }, { status: 400 });
     }
+
+    // Delete embeddings first
+    await deleteMemoryEmbeddings(memoryId);
 
     await deleteMemory(memoryId, user.id);
     return NextResponse.json({ success: true });

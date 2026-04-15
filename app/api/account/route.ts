@@ -42,6 +42,18 @@ export async function GET(request: NextRequest) {
     const chatCount = fullUser.chats.length;
     const projectCount = fullUser.projects.length;
 
+    // Get file count - files owned by user via project or chat associations
+    const projectFileCount = await prisma.projectFile.count({
+      where: { project: { userId: fullUser.id } },
+    });
+    const chatFileCount = await prisma.chatFile.count({
+      where: { chat: { userId: fullUser.id } },
+    });
+    const messageFileCount = await prisma.messageFile.count({
+      where: { message: { chat: { userId: fullUser.id } } },
+    });
+    const fileCount = projectFileCount + chatFileCount + messageFileCount;
+
     // Get message count from all chats
     const messageCountResult = await prisma.message.count({
       where: {
@@ -115,6 +127,7 @@ export async function GET(request: NextRequest) {
         chats: chatCount,
         projects: projectCount,
         messages: messageCountResult,
+        files: fileCount,
       },
       monthlyUsage: {
         chats: monthlyChatCount,
