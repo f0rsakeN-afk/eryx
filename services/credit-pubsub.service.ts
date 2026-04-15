@@ -37,7 +37,7 @@ export type CreditEvent = CreditsUpdatedEvent;
  * Build the full credits data payload
  * Used when publishing updates after any credit operation
  */
-export async function buildCreditsPayload(userId: string): Promise<CreditsUpdatedEvent["credits"] & { subscription: CreditsUpdatedEvent["subscription"]; plan: CreditsUpdatedEvent["plan"] }> {
+export async function buildCreditsPayload(userId: string): Promise<Omit<CreditsUpdatedEvent, "type" | "reason">> {
   const { getUserSubscription } = await import("@/services/credit.service");
 
   const userData = await getUserSubscription(userId);
@@ -46,7 +46,8 @@ export async function buildCreditsPayload(userId: string): Promise<CreditsUpdate
   }
 
   const currentCredits = userData.credits;
-  const planCredits = userData.userPlan?.credits || 25;
+  // Default to free plan credits (25) - plan-specific credits would need to be fetched separately
+  const planCredits = 25;
   const hasActiveSubscription = userData.subscription?.status === "ACTIVE" || userData.subscription?.status === "TRIALING";
 
   const usedCredits = Math.max(0, planCredits - currentCredits);
@@ -85,7 +86,7 @@ export async function buildCreditsPayload(userId: string): Promise<CreditsUpdate
         },
     plan: {
       name: userData.planName || "Free",
-      tier: userData.planTier,
+      tier: String(userData.planTier),
     },
   };
 }

@@ -11,6 +11,7 @@ import prisma from "@/lib/prisma";
 import { invalidateUserLimitsCache } from "@/services/limit.service";
 import { invalidateUserCreditsCache } from "@/services/credit.service";
 import { publishCreditsUpdated } from "@/services/credit-pubsub.service";
+import { queueEmail } from "@/services/queue.service";
 import { logger } from "@/lib/logger";
 
 /**
@@ -125,6 +126,16 @@ async function handleOrderPaid(payload: Record<string, unknown>): Promise<void> 
     logger.error("[WebhookHandler] Failed to publish credits update:", err);
   });
 
+  // Send credits-added email
+  const newBalance = (user.credits || 0) + credits;
+  queueEmail(user.email, "credits-added", {
+    name: user.email?.split("@")[0] || "User",
+    credits,
+    newBalance,
+  }).catch((err) => {
+    logger.error("[WebhookHandler] Failed to queue credits-added email:", err);
+  });
+
   logger.info(`[WebhookHandler] Added ${credits} credits to user ${userId}`);
 }
 
@@ -166,16 +177,16 @@ async function handleSubscriptionCreated(payload: Record<string, unknown>): Prom
   const currentPeriodEnd = new Date();
   currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
 
-  const stripeSubId = (payload.id as string) || null;
-  const stripeCustomerId = ((payload.customer || {}) as { id?: string })?.id || null;
+  const polarSubscriptionId = (payload.id as string) || null;
+  const polarCustomerId = ((payload.customer || {}) as { id?: string })?.id || null;
 
   if (existingSub) {
     await prisma.subscription.update({
       where: { userId },
       data: {
         planId,
-        stripeSubId,
-        stripeCustomerId,
+        polarSubscriptionId,
+        polarCustomerId,
         status,
         currentPeriodStart,
         currentPeriodEnd,
@@ -187,8 +198,8 @@ async function handleSubscriptionCreated(payload: Record<string, unknown>): Prom
       data: {
         userId,
         planId,
-        stripeSubId,
-        stripeCustomerId,
+        polarSubscriptionId,
+        polarCustomerId,
         status,
         currentPeriodStart,
         currentPeriodEnd,
@@ -214,6 +225,20 @@ async function handleSubscriptionCreated(payload: Record<string, unknown>): Prom
   await invalidateUserCreditsCache(userId);
   await invalidateUserLimitsCache(userId);
 
+  // Send subscription-activated email
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user?.email) {
+    queueEmail(user.email, "subscription-activated", {
+      name: user.email.split("@")[0] || "User",
+      planName: plan.name,
+      credits: plan.credits,
+      maxProjects: plan.maxProjects,
+      maxChats: plan.maxChats,
+    }).catch((err) => {
+      logger.error("[WebhookHandler] Failed to queue subscription-activated email:", err);
+    });
+  }
+
   logger.info(`[WebhookHandler] Subscription created for user ${userId}, plan: ${planId}`);
 }
 
@@ -227,19 +252,19 @@ async function handleSubscriptionUpdated(payload: Record<string, unknown>): Prom
     return;
   }
 
-  const stripeSubId = payload.id as string;
-  if (!stripeSubId) {
+  const polarSubscriptionId = payload.id as string;
+  if (!polarSubscriptionId) {
     logger.error("[WebhookHandler] No subscription ID in subscription.updated");
     return;
   }
 
-  // Find subscription by stripe ID
+  // Find subscription by Polar ID
   const subscription = await prisma.subscription.findFirst({
-    where: { OR: [{ stripeSubId }, { userId }] },
+    where: { OR: [{ polarSubscriptionId }, { userId }] },
   });
 
   if (!subscription) {
-    logger.error(`[WebhookHandler] Subscription not found for ${stripeSubId}`);
+    logger.error(`[WebhookHandler] Subscription not found for ${polarSubscriptionId}`);
     return;
   }
 
@@ -277,16 +302,16 @@ async function handleSubscriptionCanceled(payload: Record<string, unknown>): Pro
     return;
   }
 
-  const stripeSubId = payload.id as string;
+  const polarSubscriptionId = payload.id as string;
 
   const updateData: Record<string, unknown> = {
     status: "CANCELED",
     canceledAt: new Date(),
   };
 
-  if (stripeSubId) {
+  if (polarSubscriptionId) {
     await prisma.subscription.updateMany({
-      where: { stripeSubId },
+      where: { polarSubscriptionId },
       data: updateData,
     });
   } else {
@@ -300,6 +325,17 @@ async function handleSubscriptionCanceled(payload: Record<string, unknown>): Pro
   // They stay on current plan until credits run out
   await invalidateUserCreditsCache(userId);
   await invalidateUserLimitsCache(userId);
+
+  // Send subscription-canceled email
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user?.email) {
+    queueEmail(user.email, "subscription-canceled", {
+      name: user.email.split("@")[0] || "User",
+      credits: user.credits,
+    }).catch((err) => {
+      logger.error("[WebhookHandler] Failed to queue subscription-canceled email:", err);
+    });
+  }
 
   logger.info(`[WebhookHandler] Subscription canceled for user ${userId}`);
 }

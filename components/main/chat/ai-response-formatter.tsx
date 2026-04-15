@@ -11,6 +11,7 @@ import React, {
 import dynamic from "next/dynamic";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remend from "remend";
 import {
   ExternalLink,
   ZoomIn,
@@ -868,6 +869,10 @@ export const AiResponseFormatter = memo(function AiResponseFormatter({
   const closeMedia = useCallback(() => setActiveMedia(null), []);
   const ctxValue = useMemo(() => ({ openMedia }), [openMedia]);
 
+  // Apply remend to fix incomplete markdown patterns (e.g., streaming text)
+  // Must be called before any early returns to maintain hook order
+  const completedContent = useMemo(() => remend(content), [content]);
+
   // Bail early for empty content — avoids react-markdown overhead
   if (!content?.trim()) return null;
 
@@ -879,7 +884,7 @@ export const AiResponseFormatter = memo(function AiResponseFormatter({
           rehypePlugins={[rehypeKatex]}
           components={mdComponents}
         >
-          {content}
+          {completedContent}
         </ReactMarkdown>
         {isStreaming && <StreamingCursor />}
       </div>

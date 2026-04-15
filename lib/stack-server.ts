@@ -453,7 +453,8 @@ export async function getChatMessages(
 export async function addChatMessage(
   chatId: string,
   userId: string,
-  data: { role: "user" | "assistant"; content: string }
+  data: { role: "user" | "assistant"; content: string },
+  fileIds?: string[]
 ) {
   // Verify user owns this chat
   const chat = await prisma.chat.findFirst({
@@ -478,6 +479,16 @@ export async function addChatMessage(
       content: data.content,
     },
   });
+
+  // Link files to message if provided
+  if (fileIds && fileIds.length > 0) {
+    await prisma.messageFile.createMany({
+      data: fileIds.map((fileId) => ({
+        messageId: message.id,
+        fileId,
+      })),
+    });
+  }
 
   // Update chat's updatedAt
   await prisma.chat.update({
@@ -543,4 +554,62 @@ export async function getRecentMessages(chatId: string, limit = 20) {
     content: m.content,
     createdAt: m.createdAt.toISOString(),
   }));
+}
+
+/**
+ * Create embeddings for a file's content
+ * Called after file upload completes
+ */
+export async function createFileChunks(
+  fileId: string,
+  extractedContent: string
+): Promise<{ chunkCount: number; tokenCount: number } | null> {
+  try {
+    const { embedFile } = await import("@/services/rag.service");
+    return await embedFile(fileId, extractedContent);
+  } catch (error) {
+    console.error("[StackServer] Failed to create file chunks:", error);
+    return null;
+  }
+}
+
+/**
+ * Create embeddings for a memory
+ * Called when memory is created or updated
+ */
+export async function createMemoryEmbeddings(
+  memoryId: string,
+  content: string
+): Promise<{ chunkCount: number; tokenCount: number } | null> {
+  try {
+    const { embedMemory } = await import("@/services/rag.service");
+    return await embedMemory(memoryId, content);
+  } catch (error) {
+    console.error("[StackServer] Failed to create memory embeddings:", error);
+    return null;
+  }
+}
+
+/**
+ * Delete embeddings when a file is deleted
+ */
+export async function deleteFileEmbeddings(fileId: string): Promise<void> {
+  try {
+    const { deleteFileEmbeddings: del } = await import("@/services/rag.service");
+    await del(fileId);
+  } catch (error) {
+    console.error("[StackServer] Failed to delete file embeddings:", error);
+  }
+}
+
+/**
+ * Delete embeddings when a memory is deleted
+ */
+export async function deleteMemoryEmbeddings(memoryId: string): Promise<void> {
+  try {
+    const { deleteMemoryEmbeddings: del } = await import("@/services/rag.service");
+    await del(memoryId);
+  } catch (error) {
+    console.error("[StackServer] Failed to delete memory embeddings:", error);
+  }
 }

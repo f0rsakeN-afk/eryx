@@ -295,9 +295,9 @@ model Plan {
 
   price         Int       @default(0)  // In cents (0 = free)
 
-  // Stripe integration
-  stripePriceId   String?   @unique
-  stripeProductId String?
+  // Polar integration
+  polarPriceId   String?   @unique
+  polarProductId String?
 
   // Limits
   credits       Int       @default(25)
@@ -340,10 +340,9 @@ model Plan {
 
 ## Subscription Model
 
-Stripe subscription records.
+Polar subscription records.
 
-```prisma
-enum SubscriptionStatus {
+```prismaenum SubscriptionStatus {
   ACTIVE     // Good standing
   CANCELED   // Cancelled by user
   PAST_DUE   // Payment failed
@@ -360,8 +359,8 @@ model Subscription {
   planId        String
   plan          Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  stripeSubId     String?   @unique  // Stripe subscription ID
-  stripeCustomerId String?          // Stripe customer ID
+  polarSubscriptionId String?   @unique  // Polar subscription ID
+  polarCustomerId     String?          // Polar customer ID
 
   status        SubscriptionStatus @default(ACTIVE)
 
@@ -380,7 +379,7 @@ model Subscription {
 
   @@index([userId])
   @@index([status])
-  @@index([stripeCustomerId])
+  @@index([polarCustomerId])
   @@index([currentPeriodEnd])
 }
 ```
@@ -536,7 +535,7 @@ model Customize {
 | Message | chatId, parentId |
 | File | type, projectId, status |
 | Project | userId, archivedAt, pinnedAt, name |
-| Subscription | userId, status, stripeCustomerId, currentPeriodEnd |
+| Subscription | userId, status, polarCustomerId, currentPeriodEnd |
 | Plan | tier, isActive+isVisible |
 | Memory | userId, userId+category, createdAt |
 | Notification | userId, userId+read+archived |

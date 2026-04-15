@@ -216,6 +216,7 @@ model File {
   projectFiles ProjectFile[]
   chatFiles    ChatFile[]
   messageFiles MessageFile[]
+  fileChunks   FileChunk[]
 
   @@index([type])
   @@index([projectId])
@@ -396,15 +397,16 @@ model Settings {
 }
 
 model Memory {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  content   String
-  tags      String[]
-  category  String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String            @id @default(cuid())
+  userId           String
+  title            String
+  content          String
+  tags             String[]
+  category         String?
+  metadata         Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  memoryEmbeddings MemoryEmbedding[]
 
   @@index([userId])
   @@index([userId, category])
@@ -472,9 +474,9 @@ model Plan {
   // Pricing (in cents)
   price Int @default(0) // 0 = free
 
-  // Stripe integration
-  stripePriceId   String? @unique // Stripe Price ID (null for free)
-  stripeProductId String? // Stripe Product ID
+  // Polar integration
+  polarPriceId   String? @unique // Polar Price ID (null for free)
+  polarProductId String? // Polar Product ID
 
   // Limits
   credits     Int @default(25)
@@ -525,9 +527,9 @@ model Subscription {
   planId String
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  // Stripe
-  stripeSubId      String? @unique // Stripe subscription ID
-  stripeCustomerId String? // Stripe customer ID
+  // Polar
+  polarSubscriptionId String? @unique // Polar subscription ID
+  polarCustomerId     String? // Polar customer ID
 
   // Status
   status SubscriptionStatus @default(ACTIVE)
@@ -549,7 +551,7 @@ model Subscription {
 
   @@index([userId])
   @@index([status])
-  @@index([stripeCustomerId])
+  @@index([polarCustomerId])
   @@index([currentPeriodEnd])
 }
 
@@ -558,11 +560,11 @@ model Subscription {
 // ---------------------------------------------------------------------------
 
 model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  endpoint  String   // Push subscription endpoint URL
-  p256dh    String   // User's public key for encryption
-  auth      String   // User's auth secret for encryption
+  id       String @id @default(cuid())
+  userId   String
+  endpoint String // Push subscription endpoint URL
+  p256dh   String // User's public key for encryption
+  auth     String // User's auth secret for encryption
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -572,3 +574,36 @@ model PushSubscription {
   @@index([userId])
 }
 
+// ---------------------------------------------------------------------------
+// RAG Embeddings (pgvector)
+// ---------------------------------------------------------------------------
+
+model FileChunk {
+  id         String                      @id @default(cuid())
+  fileId     String
+  chunkIndex Int
+  content    String
+  embedding  Unsupported("vector(1536)") // Cohere embed-v7-multilingual uses 1536 dims
+  tokenCount Int
+
+  createdAt DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([fileId, chunkIndex])
+}
+
+model MemoryEmbedding {
+  id         String                      @id @default(cuid())
+  memoryId   String
+  content    String
+  embedding  Unsupported("vector(1536)")
+  tokenCount Int
+
+  createdAt DateTime @default(now())
+
+  memory Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@index([memoryId])
+}

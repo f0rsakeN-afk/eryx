@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import Groq from "groq-sdk";
 import prisma from "@/lib/prisma";
 import redis, { KEYS } from "@/lib/redis";
 import { buildSystemPrompt, type PromptConfig } from "@/lib/prompts";
@@ -12,9 +11,18 @@ import { publishMessageNew } from "@/services/chat-pubsub.service";
 import { notifyNewMessage } from "@/services/push-notification.service";
 import { checkChatRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { webSearch, type SearchResult } from "@/lib/web-search";
+import {
+  startResumableStream,
+  resumeResumableStream,
+  stopResumableStream,
+  getStreamId,
+  isStreamActive,
+} from "@/services/resumable-stream.service";
+import { buildProjectContext, buildProjectContextSection, getProjectFilesForContext } from "@/services/project-context.service";
+import { retrieveContext, formatContextForPrompt } from "@/services/rag.service";
 
-const groq = new Groq();
-const groqBreaker = getCircuitBreaker("groq");
+// Track which chat+stream combinations have been superseded (user sent new message)
+const supersededStreams = new Set<string>();
 
 /**
  * Format search results for injection into system prompt
@@ -54,12 +62,222 @@ function extractDomain(url: string): string {
 }
 
 /**
+ * Get extracted content from files attached to recent chat messages
+ * Uses keyword matching to prioritize relevant content for large files
+ */
+async function getChatFileContents(
+  chatId: string,
+  incomingMessages?: Array<{ role: string; content: string }>
+): Promise<Array<{ name: string; content: string }>> {
+  // Get recent messages with their file attachments
+  const recentMessages = await prisma.message.findMany({
+    where: { chatId },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      messageFiles: {
+        select: {
+          file: {
+            select: {
+              id: true,
+              name: true,
+              extractedContent: true,
+              tokenCount: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Collect unique files with their contents
+  const fileMap = new Map<string, { name: string; content: string; tokenCount: number }>();
+  for (const msg of recentMessages) {
+    for (const mf of msg.messageFiles) {
+      const file = mf.file;
+      if (file.extractedContent && !fileMap.has(file.id)) {
+        fileMap.set(file.id, {
+          name: file.name,
+          content: file.extractedContent,
+          tokenCount: file.tokenCount || Math.ceil(file.extractedContent.length / 4),
+        });
+      }
+    }
+  }
+
+  // Extract keywords from incoming messages for relevance scoring
+  const keywords = extractKeywords(incomingMessages || []);
+
+  // Score and sort files by relevance
+  const scoredFiles = Array.from(fileMap.values()).map((file) => {
+    const relevanceScore = keywords.length > 0
+      ? calculateRelevance(file.content, keywords)
+      : 1;
+    return {
+      ...file,
+      relevanceScore,
+    };
+  });
+
+  // Sort by relevance (descending) then by token count (ascending for packing)
+  scoredFiles.sort((a, b) => {
+    if (b.relevanceScore !== a.relevanceScore) {
+      return b.relevanceScore - a.relevanceScore;
+    }
+    return a.tokenCount - b.tokenCount;
+  });
+
+  // Select files respecting token budget
+  const result: Array<{ name: string; content: string }> = [];
+  let totalTokens = 0;
+  const maxTokens = 4000;
+
+  for (const file of scoredFiles) {
+    // For large files (>2000 tokens), try to extract relevant sections
+    if (file.tokenCount > 2000 && keywords.length > 0) {
+      const relevantContent = extractRelevantSection(file.content, keywords, 3000);
+      if (relevantContent.length > 0) {
+        result.push({ name: file.name, content: relevantContent });
+        totalTokens += Math.ceil(relevantContent.length / 4);
+        continue;
+      }
+    }
+
+    // For smaller files or when no keywords, use full content with truncation
+    const truncatedContent = file.content.slice(0, 5000);
+    const tokens = Math.ceil(truncatedContent.length / 4);
+
+    if (totalTokens + tokens <= maxTokens) {
+      result.push({ name: file.name, content: truncatedContent });
+      totalTokens += tokens;
+    } else {
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract keywords from messages for relevance scoring
+ */
+function extractKeywords(messages: Array<{ role: string; content: string }>): string[] {
+  // Get all content
+  const allContent = messages.map((m) => m.content).join(" ");
+
+  // Extract words (3+ chars) and count frequency
+  const wordCounts = new Map<string, number>();
+  const words = allContent.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
+
+  for (const word of words) {
+    // Filter common stop words
+    const stopWords = new Set(["the", "and", "for", "are", "but", "not", "you", "all", "can", "her", "was", "one", "our", "out", "this", "that", "with", "have", "from", "they", "been", "were", "going", "know", "like", "just", "more", "than", "what", "when", "your"]);
+    if (stopWords.has(word)) continue;
+
+    wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
+  }
+
+  // Get top keywords by frequency
+  return Array.from(wordCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([word]) => word);
+}
+
+/**
+ * Calculate relevance score based on keyword matches
+ */
+function calculateRelevance(content: string, keywords: string[]): number {
+  const lowerContent = content.toLowerCase();
+  let score = 0;
+  for (const keyword of keywords) {
+    const regex = new RegExp(`\\b${keyword}\\b`, "gi");
+    const matches = lowerContent.match(regex);
+    if (matches) {
+      score += matches.length;
+    }
+  }
+  return score;
+}
+
+/**
+ * Extract relevant section from content based on keywords
+ * Returns content around keyword matches
+ */
+function extractRelevantSection(content: string, keywords: string[], maxLength: number): string {
+  const lowerContent = content.toLowerCase();
+
+  // Find all keyword positions
+  const positions: number[] = [];
+  for (const keyword of keywords) {
+    let pos = 0;
+    while (true) {
+      const found = lowerContent.indexOf(keyword, pos);
+      if (found === -1) break;
+      positions.push(found);
+      pos = found + 1;
+    }
+  }
+
+  if (positions.length === 0) {
+    // No keywords found, return beginning
+    return content.slice(0, maxLength);
+  }
+
+  // Sort positions and find dense clusters
+  positions.sort((a, b) => a - b);
+
+  // Find the most dense region
+  let bestStart = 0;
+  let bestDensity = 0;
+  const windowSize = 500; // characters
+
+  for (let i = 0; i < positions.length; i++) {
+    const windowStart = positions[i];
+    const windowEnd = positions[i] + windowSize;
+    const density = positions.filter((p) => p >= windowStart && p <= windowEnd).length;
+
+    if (density > bestDensity) {
+      bestDensity = density;
+      bestStart = Math.max(0, windowStart - 100);
+    }
+  }
+
+  // Extract content around the best region
+  let start = bestStart;
+  let end = Math.min(start + maxLength, content.length);
+
+  // Adjust to word boundaries
+  if (start > 0) {
+    const spacePos = content.lastIndexOf(" ", start);
+    if (spacePos !== -1 && spacePos > start - 100) {
+      start = spacePos + 1;
+    }
+  }
+
+  if (end < content.length) {
+    const spacePos = content.indexOf(" ", end);
+    if (spacePos !== -1 && spacePos < end + 100) {
+      end = spacePos;
+    }
+  }
+
+  let result = content.slice(start, end);
+
+  // Add context markers
+  if (start > 0) {
+    result = "... " + result;
+  }
+  if (end < content.length) {
+    result = result + " ...";
+  }
+
+  return result;
+}
+
+/**
  * Build messages for AI with smart context retrieval
- *
- * Uses hierarchical context:
- * 1. If chat has summary: summary + recent messages
- * 2. If chat is short: all messages
- * 3. Always preserves key facts
  */
 async function buildMessages(
   chatId: string,
@@ -80,7 +298,6 @@ async function buildMessages(
     throw new Error("Chat not found");
   }
 
-  // Get user preferences from cache
   // @ts-expect-error Prisma email type inference issue
   const userPreferences = await getUserPreferences(chat.userId, chat.user.email ?? '');
 
@@ -95,7 +312,7 @@ async function buildMessages(
     projectInstruction: chat.project?.instruction || undefined,
   };
 
-  // Get smart context (uses summary + recent messages)
+  // Get smart context
   const { messages: contextMessages, summary, topics, keyFacts, truncated } = await getChatContext(chatId, {
     maxTokens: aiConfig.maxContextTokens,
   });
@@ -103,32 +320,77 @@ async function buildMessages(
   // Build system prompt
   let systemPrompt = buildSystemPrompt(promptConfig);
 
-  // Add summary context if available
+  // Get memory context for user
+  const memoryContexts = await retrieveContext(incomingMessages.map(m => m.content).join(" "), {
+    maxTokens: 1000,
+    userId: chat.userId || undefined,
+  });
+
+  if (memoryContexts.length > 0) {
+    const memoryContextText = formatContextForPrompt(memoryContexts);
+    systemPrompt += "\n\n" + memoryContextText;
+  }
+
+  // Get project context files and use RAG for semantic retrieval
+  if (chat.projectId && chat.project) {
+    const projectContext = await buildProjectContext(chat.projectId);
+    if (projectContext.files.length > 0) {
+      // Get file IDs for RAG retrieval
+      const fileIds = projectContext.files.map(f => f.id);
+
+      // Use RAG to retrieve relevant context with embeddings
+      const ragContexts = await retrieveContext(incomingMessages.map(m => m.content).join(" "), {
+        fileIds,
+        maxTokens: 3000,
+        userId: chat.userId || undefined,
+      });
+
+      if (ragContexts.length > 0) {
+        const ragContextText = formatContextForPrompt(ragContexts);
+        systemPrompt += "\n\n" + ragContextText;
+      } else {
+        // Fallback to keyword-based retrieval if RAG returns nothing
+        const filesForContext = getProjectFilesForContext(projectContext.files, 4000);
+        if (filesForContext.length > 0) {
+          systemPrompt += "\n\n" + buildProjectContextSection(
+            chat.project.name,
+            projectContext.instruction,
+            filesForContext
+          );
+        }
+      }
+    }
+  }
+
+  // Add chat-attached file contents from recent messages
+  const chatFileContents = await getChatFileContents(chatId, incomingMessages);
+  if (chatFileContents.length > 0) {
+    systemPrompt += "\n\n## Attached Files\n";
+    for (const file of chatFileContents) {
+      systemPrompt += `### ${file.name}\n${file.content}\n---\n`;
+    }
+  }
+
   if (summary) {
     systemPrompt += `\n\nCONVERSATION SUMMARY:\n${summary}`;
   }
 
-  // Add topics if we have them
   if (topics && topics.length > 0) {
     systemPrompt += `\n\nTopics: ${topics.join(", ")}`;
   }
 
-  // Add key facts preservation note
   if (keyFacts && keyFacts.length > 0) {
     systemPrompt += `\n\nKEY FACTS TO PRESERVE:\n${keyFacts.map((f, i) => `${i + 1}. ${f}`).join("\n")}`;
   }
 
-  // Add truncation notice if needed
   if (truncated) {
-    systemPrompt += `\n\n[Note: Earlier messages were summarized for context efficiency. Recent messages are shown below.]`;
+    systemPrompt += `\n\n[Note: Earlier messages were summarized for context efficiency.]`;
   }
 
-  // Add web search results if available
   if (searchResults && searchResults.length > 0) {
     systemPrompt += formatSearchResultsForPrompt(searchResults);
   }
 
-  // Build final message array
   const contextParts = contextMessages.map((m): { role: "user" | "assistant"; content: string } => ({
     role: m.role as "user" | "assistant",
     content: m.content,
@@ -141,7 +403,19 @@ async function buildMessages(
   ];
 }
 
+/**
+ * Get stream tracking key for superseded check
+ */
+function getSupersededKey(chatId: string, streamVersion: number): string {
+  return `superseded:${chatId}:${streamVersion}`;
+}
+
+/**
+ * POST - Start or resume a chat stream
+ */
 export async function POST(req: NextRequest) {
+  const streamVersion = Date.now();
+
   try {
     // Check rate limit
     const rateLimit = await checkChatRateLimit(req);
@@ -158,7 +432,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { messages, chatId, mode } = body;
+    const { messages, chatId, mode, resume } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(JSON.stringify({ error: "Messages required" }), {
@@ -187,15 +461,71 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const supersededKey = getSupersededKey(chatId, streamVersion);
+
     // Check credits before processing
     const { checkCreditsForOperation, deductCredits, addCredits } = await import("@/services/credit.service");
     const { polarConfig } = await import("@/lib/polar-config");
 
-    // Determine cost based on model
     const model = aiConfig.model as keyof typeof polarConfig.creditCosts;
     const cost = polarConfig.creditCosts[model] || 1;
 
-    // Check if user has enough credits
+    // Try to resume existing stream if requested
+    if (resume) {
+      const streamId = getStreamId(chatId);
+      console.log(`[Chat] Attempting to resume stream: ${streamId}`);
+
+      try {
+        const resumed = await resumeResumableStream(
+          chatId,
+          (chunk, isResume) => {
+            // Chunks from resume - we don't save during resume, just stream to client
+          },
+          (content, isResume) => {
+            // Check if this stream was superseded before saving
+            if (supersededStreams.has(supersededKey)) {
+              console.log(`[Chat] Resumed stream was superseded, not saving`);
+              return;
+            }
+            // Save to DB only if this is the current active stream
+            saveAIResponse(chatId, user.id, content).catch(console.error);
+          },
+          (error, isResume) => {
+            console.error("[Chat] Resume stream error:", error);
+          }
+        );
+
+        if (resumed && resumed.hasExisting) {
+          console.log(`[Chat] Resumed existing stream: ${streamId}`);
+          return new Response(resumed.stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "X-Stream-Resumed": "true",
+              "X-Stream-ID": streamId,
+            },
+          });
+        }
+      } catch (resumeError) {
+        console.log(`[Chat] Could not resume stream, starting fresh:`, resumeError);
+      }
+    }
+
+    // If there's an existing active stream for this chat, STOP IT FIRST
+    // This is critical to prevent race conditions
+    if (isStreamActive(chatId)) {
+      console.log(`[Chat] Stopping existing stream for chat ${chatId}`);
+      // Mark current stream as superseded BEFORE stopping
+      // The old stream's onComplete will check this and not save
+      supersededStreams.add(supersededKey);
+      // Clean up old superseded keys (keep only last 10)
+      cleanupSupersededKeys(chatId);
+      // Stop the old stream
+      await stopResumableStream(chatId);
+    }
+
+    // Check credits for new stream
     const hasCredits = await checkCreditsForOperation(user.id, model);
     if (!hasCredits) {
       const { getUserCredits } = await import("@/services/credit.service");
@@ -211,7 +541,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Build messages with smart context (before deducting - if this fails, no credits deducted)
+    // Build messages
     let fullMessages = await buildMessages(chatId, messages);
 
     if (fullMessages.length === 0 || (fullMessages.length === 1 && fullMessages[0].role === "system")) {
@@ -221,22 +551,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Stream from Groq with circuit breaker protection
-    let stream;
+    // Track state
     let creditsDeducted = false;
     let webSearchCreditsDeducted = false;
     let searchResults: SearchResult[] = [];
+    let stopFn: (() => void) | null = null;
+
+    const encoder = new TextEncoder();
 
     // Helper to emit SSE event
     const emitEvent = (controller: ReadableStreamDefaultController, event: object) => {
       controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
     };
 
-    const encoder = new TextEncoder();
-
-    // Web search mode: perform search with timeout, don't block AI
+    // Web search mode
     if (mode === "web") {
-      // Check web search credits
       const webSearchCost = polarConfig.creditCosts["web-search"] || 3;
       const hasWebSearchCredits = await checkCreditsForOperation(user.id, "web-search");
       if (!hasWebSearchCredits) {
@@ -254,7 +583,6 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Deduct web search credits upfront (will be refunded if AI fails)
       try {
         await deductCredits(user.id, "web-search");
         webSearchCreditsDeducted = true;
@@ -263,20 +591,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let fullResponse = "";
+    // Deduct AI credits
+    try {
+      await deductCredits(user.id, model);
+      creditsDeducted = true;
+    } catch (error) {
+      if (creditsDeducted) {
+        addCredits(user.id, cost).catch((err) => {
+          console.error("[Chat] Failed to refund AI credits:", err);
+        });
+      }
+      if (webSearchCreditsDeducted) {
+        addCredits(user.id, polarConfig.creditCosts["web-search"] || 3).catch((err) => {
+          console.error("[Chat] Failed to refund web search credits:", err);
+        });
+      }
+      throw error;
+    }
 
-    // Build initial messages without search (for streaming start)
-    fullMessages = await buildMessages(chatId, messages);
-
-    // Web search mode: prepare search but don't block
-    let searchPromise: Promise<void> | null = null;
+    // Web search preparation
     let searchCompleted = false;
+    let searchPromise: Promise<void> | null = null;
 
     if (mode === "web") {
       const lastUserMessage = messages[messages.length - 1]?.content || "";
       const searchQuery = lastUserMessage.slice(0, 500);
 
-      // Fire search in background
       searchPromise = webSearch(searchQuery, { limit: 10 })
         .then(async (searchResponse) => {
           searchResults = searchResponse.results;
@@ -291,25 +631,40 @@ export async function POST(req: NextRequest) {
         });
     }
 
-    // Deduct AI credits and start AI stream
-    try {
-      await deductCredits(user.id, model);
-      creditsDeducted = true;
+    // Create resumable stream
+    let resumableStream: ReadableStream | null = null;
 
-      stream = await groqBreaker.execute(() =>
-        groq.chat.completions.create({
-          model: aiConfig.model,
-          messages: fullMessages as any,
-          stream: true,
-          temperature: aiConfig.temperature,
-          max_tokens: aiConfig.maxTokens,
-        })
+    try {
+      const result = await startResumableStream(
+        chatId,
+        fullMessages,
+        (chunk, isResume) => {
+          // onChunk - content streamed to client via SSE
+        },
+        (content, isResume) => {
+          // onComplete - save to DB ONLY if not superseded
+          if (supersededStreams.has(supersededKey)) {
+            console.log(`[Chat] Stream was superseded (user sent new message), not saving`);
+            return;
+          }
+          // This is the final, active stream - save to DB
+          saveAIResponse(chatId, user.id, content).catch(console.error);
+        },
+        (error, isResume) => {
+          // onError - log but don't save partial content on error
+          console.error("[Chat] Stream error:", error);
+          // On error, we might want to refund credits if no useful content was generated
+          // But this is complex - for now we don't refund on error
+        }
       );
+
+      resumableStream = result.stream;
+      stopFn = result.stop;
     } catch (error) {
-      // Refund credits if Groq call failed
+      // Refund credits on stream creation failure
       if (creditsDeducted) {
         addCredits(user.id, cost).catch((err) => {
-          console.error("[Chat] Failed to refund AI credits after Groq failure:", err);
+          console.error("[Chat] Failed to refund AI credits:", err);
         });
       }
       if (webSearchCreditsDeducted) {
@@ -331,12 +686,13 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
+    const streamId = getStreamId(chatId);
+
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          // Web mode: emit step events for progress feedback
+          // Web mode: emit step events
           if (mode === "web") {
-            // Emit search_start event immediately
             emitEvent(controller, {
               type: "step",
               step: "search",
@@ -344,14 +700,16 @@ export async function POST(req: NextRequest) {
               message: "Searching the web...",
             });
 
-            // Wait for search to complete (with 5s timeout) while AI is warming up
+            // Wait for search to complete (with max 10s timeout)
             const timeoutPromise = new Promise<void>((resolve) =>
-              setTimeout(() => resolve(), 5000)
+              setTimeout(() => resolve(), 10000)
             );
 
             await Promise.race([searchPromise, timeoutPromise]);
 
-            // Emit search complete/skip
+            // Wait additional 500ms after race to ensure searchPromise has set results
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
             if (searchResults.length > 0) {
               emitEvent(controller, {
                 type: "step",
@@ -378,19 +736,38 @@ export async function POST(req: NextRequest) {
             message: "Generating response...",
           });
 
-          for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content;
-            if (content) {
-              fullResponse += content;
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`)
-              );
+          // Read from resumable stream and forward to SSE
+          const reader = resumableStream!.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const text = decoder.decode(value, { stream: true });
+            const lines = text.split("\n").filter((line) => line.startsWith("data: "));
+
+            for (const line of lines) {
+              const data = line.slice(6);
+              if (data === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed.content || parsed.choices?.[0]?.delta?.content;
+                if (delta) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`)
+                  );
+                }
+              } catch {
+                // Skip malformed JSON
+              }
             }
           }
         } catch (streamError) {
           console.error("[chat] Stream error:", streamError);
         } finally {
-          // Emit completion step
+          // Emit completion
           emitEvent(controller, {
             type: "step",
             step: "ai",
@@ -399,8 +776,7 @@ export async function POST(req: NextRequest) {
           });
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
-          // Save response and trigger summarization check
-          saveAIResponse(chatId, user.id, fullResponse).catch(console.error);
+          stopFn?.();
         }
       },
     });
@@ -410,6 +786,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "X-Stream-ID": streamId,
       },
     });
   } catch (error) {
@@ -422,8 +799,71 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * DELETE - Stop a running stream
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await validateAuth(req);
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { chatId } = body;
+
+    if (!chatId) {
+      return new Response(JSON.stringify({ error: "Chat ID required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify user owns this chat
+    const chat = await prisma.chat.findFirst({
+      where: { id: chatId, userId: user.id },
+      select: { id: true },
+    });
+
+    if (!chat) {
+      return new Response(JSON.stringify({ error: "Chat not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Stop the resumable stream
+    await stopResumableStream(chatId);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("[chat] Stop stream error:", error);
+    return new Response(JSON.stringify({ error: "Failed to stop stream" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+/**
+ * Cleanup old superseded stream keys for a chat
+ */
+function cleanupSupersededKeys(chatId: string) {
+  // Keep only the last 10 superseded keys per chat
+  const prefix = `superseded:${chatId}:`;
+  for (const key of supersededStreams) {
+    if (key.startsWith(prefix)) {
+      supersededStreams.delete(key);
+    }
+  }
+}
+
+/**
  * Backend-side save of AI response
- * Saves to database and triggers async summarization
  */
 async function saveAIResponse(
   chatId: string,
@@ -449,15 +889,12 @@ async function saveAIResponse(
       data: { updatedAt: new Date() },
     });
 
-    // Invalidate user chat list cache
     try {
       await redis.del(KEYS.userChats(userId));
     } catch {
       // Redis error, ignore
     }
 
-    // Publish to Redis for real-time SSE subscribers
-    // This notifies other devices viewing the same chat
     await publishMessageNew(chatId, userId, {
       id: message.id,
       role: message.role || "assistant",
@@ -465,8 +902,6 @@ async function saveAIResponse(
       createdAt: message.createdAt,
     });
 
-    // Send push notification (fire and forget)
-    // This notifies users who are not currently viewing the chat
     notifyNewMessage(
       userId,
       chatId,
@@ -476,7 +911,6 @@ async function saveAIResponse(
       console.error("[Push] Failed to send notification:", err);
     });
 
-    // Trigger async summarization check (fire and forget)
     queueSummarization(chatId).catch(console.error);
 
     return message;

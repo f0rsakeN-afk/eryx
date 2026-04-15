@@ -190,12 +190,13 @@ export async function getMessages(
 
 export async function sendMessage(
   chatId: string,
-  data: { role: "user" | "assistant"; content: string }
+  data: { role: "user" | "assistant"; content: string },
+  fileIds?: string[]
 ): Promise<Message> {
   const res = await fetch(`/api/chats/${chatId}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, fileIds }),
   });
   if (!res.ok) throw new Error("Failed to send message");
   return res.json();
@@ -231,11 +232,12 @@ export interface SearchResult {
 }
 
 export interface StreamCallbacks {
-  onChunk: (content: string) => void;
-  onComplete?: (fullResponse: string) => void;
-  onError?: (error: Error) => void;
+  onChunk: (content: string, isResume?: boolean) => void;
+  onComplete?: (fullResponse: string, isResume?: boolean) => void;
+  onError?: (error: Error, isResume?: boolean) => void;
   onSearchComplete?: (results: SearchResult[]) => void;
   onStep?: (step: { step: string; status: string; message: string; results?: SearchResult[] }) => void;
+  onResume?: () => void; // Called when stream was resumed from existing chunks
 }
 
 export async function streamChat(
@@ -243,113 +245,160 @@ export async function streamChat(
   messages: Array<{ role: string; content: string }>,
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
-  mode?: "chat" | "web"
+  mode?: "chat" | "web",
+  options?: { resume?: boolean; maxRetries?: number }
 ): Promise<string> {
-  const { onChunk, onComplete, onError, onSearchComplete, onStep } = callbacks;
+  const { onChunk, onComplete, onError, onSearchComplete, onStep, onResume } = callbacks;
+  const maxRetries = options?.maxRetries ?? 2;
+  let attempt = 0;
 
-  try {
+  const doFetch = async (isResume: boolean): Promise<{ res: Response; resumed: boolean }> => {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId, messages, mode }),
+      body: JSON.stringify({ chatId, messages, mode, resume: isResume }),
       signal,
     });
 
-    if (!res.ok) {
-      // Try to parse error JSON first (e.g., 402 credits error)
-      const contentType = res.headers.get("content-type");
-      let errorData: { error: string; message?: string; required?: number; current?: number; upgradeTo?: string } = { error: "Request failed" };
-      if (contentType?.includes("application/json")) {
-        try {
-          errorData = await res.json();
-        } catch { /* ignore parse failure */ }
+    const resumed = res.headers.get("X-Stream-Resumed") === "true";
+    return { res, resumed };
+  };
+
+  while (attempt <= maxRetries) {
+    try {
+      const { res, resumed } = await doFetch(attempt > 0);
+
+      // If we successfully resumed, call onResume
+      if (resumed && attempt > 0) {
+        onResume?.();
       }
-      const err = new Error(errorData.error || `Request failed with status ${res.status}`) as Error & { code?: string; message?: string; required?: number; current?: number; upgradeTo?: string };
-      err.code = "CREDIT_ERROR";
-      err.message = errorData.message || `Insufficient credits. Required: ${errorData.required}, Current: ${errorData.current}`;
-      err.required = errorData.required;
-      err.current = errorData.current;
-      err.upgradeTo = "Pro";
-      throw err;
-    }
 
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error("No response body");
-
-    const decoder = new TextDecoder();
-    let accumulated = "";
-
-    // Throttle chunk updates for smooth rendering (~60fps)
-    let pendingDeltas: string[] = [];
-    let throttleTimeout: ReturnType<typeof setTimeout> | null = null;
-    const THROTTLE_MS = 16; // ~60fps
-
-    const flushDeltas = () => {
-      if (pendingDeltas.length > 0) {
-        const combined = pendingDeltas.join("");
-        onChunk(combined);
-        pendingDeltas = [];
-      }
-      throttleTimeout = null;
-    };
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      const text = decoder.decode(value, { stream: true });
-      const lines = text.split("\n").filter((line) => line.startsWith("data: "));
-
-      for (const line of lines) {
-        const data = line.slice(6);
-        if (data === "[DONE]") {
-          continue;
+      if (!res.ok) {
+        const contentType = res.headers.get("content-type");
+        let errorData: { error: string; message?: string; required?: number; current?: number; upgradeTo?: string } = { error: "Request failed" };
+        if (contentType?.includes("application/json")) {
+          try {
+            errorData = await res.json();
+          } catch { /* ignore parse failure */ }
         }
+        const err = new Error(errorData.error || `Request failed with status ${res.status}`) as Error & { code?: string; message?: string; required?: number; current?: number; upgradeTo?: string };
+        err.code = "CREDIT_ERROR";
+        err.message = errorData.message || `Insufficient credits. Required: ${errorData.required}, Current: ${errorData.current}`;
+        err.required = errorData.required;
+        err.current = errorData.current;
+        err.upgradeTo = "Pro";
+        throw err;
+      }
 
-        try {
-          const parsed = JSON.parse(data);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
 
-          // Handle step events immediately (not throttled)
-          if (parsed.type === "step") {
-            onStep?.({
-              step: parsed.step,
-              status: parsed.status,
-              message: parsed.message,
-              results: parsed.results,
-            });
-            // Also call onSearchComplete if search step completed with results
-            if (parsed.step === "search" && parsed.status === "complete" && parsed.results) {
-              onSearchComplete?.(parsed.results);
-            }
+      if (resumed) {
+        onResume?.();
+        console.log("[streamChat] Stream resumed successfully");
+      }
+
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      // Throttle chunk updates for smooth rendering (~60fps)
+      let pendingDeltas: string[] = [];
+      let throttleTimeout: ReturnType<typeof setTimeout> | null = null;
+      const THROTTLE_MS = 16; // ~60fps
+
+      const flushDeltas = () => {
+        if (pendingDeltas.length > 0) {
+          const combined = pendingDeltas.join("");
+          onChunk(combined);
+          pendingDeltas = [];
+        }
+        throttleTimeout = null;
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split("\n").filter((line) => line.startsWith("data: "));
+
+        for (const line of lines) {
+          const data = line.slice(6);
+          if (data === "[DONE]") {
             continue;
           }
 
-          const delta = parsed.choices?.[0]?.delta?.content;
-          if (delta) {
-            accumulated += delta;
-            // Throttle chunk callbacks to ~60fps for smooth rendering
-            pendingDeltas.push(delta);
-            if (!throttleTimeout) {
-              throttleTimeout = setTimeout(flushDeltas, THROTTLE_MS);
+          try {
+            const parsed = JSON.parse(data);
+
+            if (parsed.type === "step") {
+              onStep?.({
+                step: parsed.step,
+                status: parsed.status,
+                message: parsed.message,
+                results: parsed.results,
+              });
+              if (parsed.step === "search" && parsed.status === "complete" && parsed.results) {
+                onSearchComplete?.(parsed.results);
+              }
+              continue;
             }
+
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              accumulated += delta;
+              pendingDeltas.push(delta);
+              if (!throttleTimeout) {
+                throttleTimeout = setTimeout(flushDeltas, THROTTLE_MS);
+              }
+            }
+          } catch {
+            // Skip malformed JSON
           }
-        } catch {
-          // Skip malformed JSON
         }
       }
-    }
 
-    // Flush any remaining deltas
-    if (throttleTimeout) {
-      clearTimeout(throttleTimeout);
-      flushDeltas();
-    }
+      if (throttleTimeout) {
+        clearTimeout(throttleTimeout);
+        flushDeltas();
+      }
 
-    onComplete?.(accumulated);
-    return accumulated;
+      onComplete?.(accumulated);
+      return accumulated;
+    } catch (error) {
+      // Check if it's an abort error (user cancelled)
+      if (error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
+
+      attempt++;
+
+      if (attempt <= maxRetries) {
+        console.log(`[streamChat] Stream interrupted, retrying (${attempt}/${maxRetries})...`);
+        // Wait before retry with exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 100));
+      } else {
+        const err = error instanceof Error ? error : new Error("Stream failed after retries");
+        onError?.(err);
+        throw err;
+      }
+    }
+  }
+
+  throw new Error("Stream failed");
+}
+
+/**
+ * Stop a running stream (broadcasts to all processes)
+ */
+export async function stopStream(chatId: string): Promise<void> {
+  try {
+    await fetch("/api/chat", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId }),
+    });
   } catch (error) {
-    const err = error instanceof Error ? error : new Error("Stream failed");
-    onError?.(err);
-    throw err;
+    console.error("[stopStream] Failed to stop stream:", error);
   }
 }

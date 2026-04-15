@@ -4,7 +4,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useMemo } from "react";
 import * as React from "react";
 import type { Message } from "@/services/chat.service";
-import { getMessages, sendMessage, streamChat } from "@/services/chat.service";
+import { getMessages, sendMessage, streamChat, stopStream } from "@/services/chat.service";
 import { retryQueueService } from "@/services/retry-queue.service";
 
 interface UseChatMessagesOptions {
@@ -21,7 +21,7 @@ interface UseChatMessagesResult {
   hasOlder: boolean;
   isFetchingOlder: boolean;
   refetch: () => void;
-  sendUserMessage: (content: string, mode?: "chat" | "web") => Promise<void>;
+  sendUserMessage: (content: string, mode?: "chat" | "web", fileIds?: string[]) => Promise<void>;
   loadOlder: () => void;
   abortCurrentMessage: () => void;
   isStreaming: boolean;
@@ -106,7 +106,7 @@ export function useChatMessages({
 
   // Send user message and get AI response
   const sendUserMessage = useCallback(
-    async (content: string, mode: "chat" | "web" = "chat") => {
+    async (content: string, mode: "chat" | "web" = "chat", fileIds?: string[]) => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -237,7 +237,7 @@ export function useChatMessages({
         // The AI placeholder is added via setQueryData and persists separately.
         // We DON'T invalidate - let the query show real data when it fetches.
         try {
-          const savedUserMsg = await sendMessage(chatId, { role: "user", content });
+          const savedUserMsg = await sendMessage(chatId, { role: "user", content }, fileIds);
 
           // Build API messages - send savedUserMsg for AI context
           // Server fetches recentMessages from DB (empty for new chat)
@@ -385,7 +385,7 @@ export function useChatMessages({
         );
 
         try {
-          const savedUserMsg = await sendMessage(chatId, { role: "user", content });
+          const savedUserMsg = await sendMessage(chatId, { role: "user", content }, fileIds);
 
           // Replace optimistic with saved
           queryClient.setQueryData(
@@ -532,7 +532,9 @@ export function useChatMessages({
       abortControllerRef.current.abort();
       isStreamingRef.current = false;
     }
-  }, []);
+    // Broadcast stop to all processes via Redis pub/sub
+    stopStream(chatId);
+  }, [chatId]);
 
   const loadOlder = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
