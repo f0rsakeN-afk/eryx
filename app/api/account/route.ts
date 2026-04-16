@@ -1,6 +1,8 @@
 /**
  * Account API
- * GET/PATCH /api/account - Get or update user account info and subscription
+ * GET /api/account - Get user account info
+ * PATCH /api/account - Update account info
+ * DELETE /api/account - Soft delete account
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,8 +10,6 @@ import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
 import { updateAccountSchema } from "@/schemas/validation";
 import { getPlan } from "@/services/plan.service";
-
-export type PlanType = "free" | "basic" | "pro" | "enterprise";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         projects: { where: { archivedAt: null } },
         userPlan: true,
         subscription: true,
+        customize: true,
       },
     });
 
@@ -35,12 +36,23 @@ export async function GET(request: NextRequest) {
 
     // Get plan limits from DB
     const planData = fullUser.userPlan || (await getPlan("free"))!;
-    const hasSubscription = fullUser.subscription?.status === "ACTIVE" || fullUser.subscription?.status === "TRIALING";
     const subscription = fullUser.subscription;
 
-    // Count usage
+    // Count usage - total
     const chatCount = fullUser.chats.length;
     const projectCount = fullUser.projects.length;
+
+    // Get file count - files owned by user via project or chat associations
+    const projectFileCount = await prisma.projectFile.count({
+      where: { project: { userId: fullUser.id } },
+    });
+    const chatFileCount = await prisma.chatFile.count({
+      where: { chat: { userId: fullUser.id } },
+    });
+    const messageFileCount = await prisma.messageFile.count({
+      where: { message: { chat: { userId: fullUser.id } } },
+    });
+    const fileCount = projectFileCount + chatFileCount + messageFileCount;
 
     // Get message count from all chats
     const messageCountResult = await prisma.message.count({
@@ -51,12 +63,37 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Monthly usage (since start of current month)
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const monthlyChatCount = await prisma.chat.count({
+      where: {
+        userId: fullUser.id,
+        createdAt: { gte: startOfMonth },
+      },
+    });
+
+    const monthlyMessageCount = await prisma.message.count({
+      where: {
+        chat: {
+          userId: fullUser.id,
+        },
+        createdAt: { gte: startOfMonth },
+      },
+    });
+
+    // Get name from customize or fallback to email
+    const displayName = fullUser.customize?.name || fullUser.email?.split("@")[0] || "User";
+
     return NextResponse.json({
       profile: {
         id: fullUser.id,
         email: fullUser.email,
-        name: fullUser.email?.split("@")[0] || "User",
+        name: displayName,
         createdAt: fullUser.createdAt,
+        isActive: fullUser.isActive,
       },
       plan: {
         name: planData.id,
@@ -90,6 +127,11 @@ export async function GET(request: NextRequest) {
         chats: chatCount,
         projects: projectCount,
         messages: messageCountResult,
+        files: fileCount,
+      },
+      monthlyUsage: {
+        chats: monthlyChatCount,
+        messages: monthlyMessageCount,
       },
     });
   } catch (error) {
@@ -105,7 +147,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only admins can update plan/credits
     const fullUser = await prisma.user.findUnique({
       where: { id: user.id },
     });
@@ -126,12 +167,8 @@ export async function PATCH(request: NextRequest) {
 
     const data = parsed.data;
 
-    // Plan changes require admin role (would check via middleware in production)
-    // For now, allow users to update their own profile name
-    const updateData: Record<string, unknown> = {};
-
+    // Update name in customize table
     if (data.name !== undefined) {
-      // Name is stored in customize, not directly on user
       await prisma.customize.upsert({
         where: { userId: user.id },
         create: {
@@ -145,26 +182,55 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    // These fields are admin-only in production
+    // Admin-only fields
     if (fullUser.role === "ADMIN" || fullUser.role === "MODERATOR") {
+      const updateData: Record<string, unknown> = {};
       if (data.plan !== undefined) updateData.planTier = data.plan.toUpperCase();
       if (data.credits !== undefined) updateData.credits = data.credits;
       if (data.maxChats !== undefined) updateData.maxChats = data.maxChats;
       if (data.maxProjects !== undefined) updateData.maxProjects = data.maxProjects;
       if (data.maxMessages !== undefined) updateData.maxMessages = data.maxMessages;
       if (data.features !== undefined) updateData.features = data.features;
-    }
 
-    if (Object.keys(updateData).length > 0) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: updateData,
-      });
+      if (Object.keys(updateData).length > 0) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: updateData,
+        });
+      }
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Update account error:", error);
     return NextResponse.json({ error: "Failed to update account" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await stackServerApp.getUser({ tokenStore: request });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!fullUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Soft delete - set isActive to false
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { isActive: false },
+    });
+
+    return NextResponse.json({ success: true, message: "Account deactivated" });
+  } catch (error) {
+    console.error("Delete account error:", error);
+    return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
   }
 }

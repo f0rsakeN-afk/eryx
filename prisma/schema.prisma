@@ -40,9 +40,9 @@ model User {
   email     String   @unique
   createdAt DateTime @default(now())
 
-  updatedAt      DateTime  @updatedAt
-  seenOnboarding Boolean   @default(false)
-  isActive       Boolean   @default(true)
+  updatedAt      DateTime @updatedAt
+  seenOnboarding Boolean  @default(false)
+  isActive       Boolean  @default(true)
 
   role      Role       @default(USER)
   reports   Report[]
@@ -50,22 +50,25 @@ model User {
   projects  Project[]
   chats     Chat[]
 
-  customize Customize?
-  settings   Settings?
+  customize         Customize?
+  settings          Settings?
+  notifications     Notification[]
+  notificationPrefs NotificationPrefs?
 
   // SaaS Premium (legacy - use planTier and planId for new system)
-  plan          String    @default("free") @map("old_plan") // DEPRECATED: use planTier
-  planTier      PlanTier  @default(FREE)
-  planId        String?   // references Plan.id (null for legacy users)
-  credits       Int       @default(25)
-  maxChats      Int       @default(100)
-  maxProjects   Int       @default(2)
-  maxMessages   Int       @default(100)
-  features      String[]  @default([])
+  plan        String   @default("free") @map("old_plan") // DEPRECATED: use planTier
+  planTier    PlanTier @default(FREE)
+  planId      String? // references Plan.id (null for legacy users)
+  credits     Int      @default(25)
+  maxChats    Int      @default(100)
+  maxProjects Int      @default(2)
+  maxMessages Int      @default(100)
+  features    String[] @default([])
 
   // Relations
-  subscription  Subscription?
-  userPlan      Plan?      @relation("UserPlan", fields: [planId], references: [id], onDelete: SetNull)
+  subscription Subscription?
+  userPlan     Plan?           @relation("UserPlan", fields: [planId], references: [id], onDelete: SetNull)
+  mcpServers   McpUserServer[]
 
   @@index([stackId])
   @@index([role])
@@ -73,30 +76,33 @@ model User {
 }
 
 model Chat {
-  id        String   @id @default(cuid())
-  title     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String    @id @default(cuid())
+  title      String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   archivedAt DateTime?
-  pinnedAt  DateTime?
+  pinnedAt   DateTime?
 
   projectId String?
   project   Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   userId    String?
-  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   chatFiles ChatFile[]
   messages  Message[]
 
+  // Chat summary for long conversations
+  summary ChatSummary?
+
   // Branch tracking
   parentChatId String?
-  parentChat   Chat?    @relation("ChatBranches", fields: [parentChatId], references: [id], onDelete: SetNull)
-  branches     Chat[]   @relation("ChatBranches")
+  parentChat   Chat?   @relation("ChatBranches", fields: [parentChatId], references: [id], onDelete: SetNull)
+  branches     Chat[]  @relation("ChatBranches")
 
   // Share settings
-  visibility     String    @default("private") // "private" | "public"
-  shareToken     String?   @unique @default(cuid())
-  shareExpiry    DateTime?
-  sharePassword  String?
+  visibility    String    @default("private") // "private" | "public"
+  shareToken    String?   @unique @default(cuid())
+  shareExpiry   DateTime?
+  sharePassword String?
 
   @@index([projectId])
   @@index([userId])
@@ -105,6 +111,7 @@ model Chat {
   @@index([userId, updatedAt])
   @@index([shareToken])
   @@index([parentChatId])
+  @@index([userId, archivedAt]) // For fetching user's chats filtered by archive status
 }
 
 enum SENDER {
@@ -114,27 +121,65 @@ enum SENDER {
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  chatId    String
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   sender String
   role   SENDER? @default(user)
 
   content String
-  type    String  @default("text")
+  type    String @default("text")
 
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   messageFiles MessageFile[]
 
   // Threading support
   parentId String?
   parent   Message?  @relation("MessageThread", fields: [parentId], references: [id], onDelete: SetNull)
-  replies Message[] @relation("MessageThread")
+  replies  Message[] @relation("MessageThread")
 
   @@index([chatId])
   @@index([parentId])
+  @@index([chatId, createdAt]) // For fetching messages in chronological order within a chat
+}
+
+// ---------------------------------------------------------------------------
+// Chat Context Summary (for long conversations)
+// ---------------------------------------------------------------------------
+
+model ChatSummary {
+  id      String @id @default(cuid())
+  chatId  String @unique // One summary per chat (we summarize incrementally)
+  version Int    @default(1) // If we ever re-summarize from scratch
+
+  // The LLM-generated summary text
+  summary String @db.Text
+
+  // Structured extraction for precise retrieval
+  topics   String[] @default([]) // ["authentication", "payments", "database"]
+  keyFacts String[] @default([]) // ["import { prisma } from '@/lib/prisma'", "API endpoint: /api/chat"]
+
+  // What messages this summary covers
+  startMessageId String // First message included in this summary
+  endMessageId   String // Last message included in this summary
+  messageCount   Int // How many messages summarized
+
+  // If conversation was branched
+  parentSummaryId String?
+
+  // Metadata
+  tokenCount Int // How many tokens in original messages
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  chat     Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  parent   ChatSummary?  @relation("SummaryBranches", fields: [parentSummaryId], references: [id], onDelete: SetNull)
+  branches ChatSummary[] @relation("SummaryBranches")
+
+  @@index([chatId])
+  @@index([parentSummaryId])
 }
 
 enum FileStatus {
@@ -145,20 +190,20 @@ enum FileStatus {
 }
 
 model File {
-  id        String @id @default(cuid())
-  name      String
-  url       String
-  type      String
+  id   String @id @default(cuid())
+  name String
+  url  String
+  type String
 
   // S3 storage
-  s3Key     String?  // S3 object key
-  s3Bucket  String?
-  uploadId  String?  // S3 multipart upload ID
+  s3Key    String? // S3 object key
+  s3Bucket String?
+  uploadId String? // S3 multipart upload ID
 
   // Extracted content for AI context
-  extractedContent String?  // Full extracted text
-  contentPreview   String?  // First 500 chars for preview
-  tokenCount      Int?     // Estimated tokens
+  extractedContent String? // Full extracted text
+  contentPreview   String? // First 500 chars for preview
+  tokenCount       Int? // Estimated tokens
 
   // Status for upload/processing
   status FileStatus @default(PENDING_UPLOAD)
@@ -172,10 +217,12 @@ model File {
   projectFiles ProjectFile[]
   chatFiles    ChatFile[]
   messageFiles MessageFile[]
+  // fileChunks  FileChunk[] // Requires pgvector extension
 
   @@index([type])
   @@index([projectId])
   @@index([status])
+  @@index([projectId, status]) // For fetching files by project with status filter
 }
 
 model ProjectFile {
@@ -224,7 +271,7 @@ model Project {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   chats        Chat[]
   projectFiles ProjectFile[]
-  files        File[]         // Direct relation for context files
+  files        File[] // Direct relation for context files
 
   @@index([userId])
   @@index([archivedAt])
@@ -268,7 +315,7 @@ model MessageFeedback {
   messageId String
   chatId    String
   userId    String
-  reaction  String   // "like" | "dislike"
+  reaction  String // "like" | "dislike"
   createdAt DateTime @default(now())
 
   @@index([messageId])
@@ -277,14 +324,14 @@ model MessageFeedback {
 }
 
 model UserPreference {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  preferredTone     String   @default("balanced")
-  detailLevel       String   @default("BALANCED")
-  totalLikes        Int      @default(0)
-  totalDislikes     Int      @default(0)
-  likeRatio         Float    @default(0.5)  // likes / (likes + dislikes)
-  lastUpdated       DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  preferredTone String   @default("balanced")
+  detailLevel   String   @default("BALANCED")
+  totalLikes    Int      @default(0)
+  totalDislikes Int      @default(0)
+  likeRatio     Float    @default(0.5) // likes / (likes + dislikes)
+  lastUpdated   DateTime @updatedAt
 
   @@index([userId])
 }
@@ -325,41 +372,42 @@ model Customize {
 }
 
 model Settings {
-  id            String  @id @default(cuid())
-  userId        String  @unique
-  theme         String  @default("system")
-  language      String  @default("en")
-  autoTitle     Boolean @default(true)
-  enterToSend   Boolean @default(false)
-  showSuggestions Boolean @default(true)
-  compactMode   Boolean @default(false)
-  reducedMotion Boolean @default(false)
-  streaming     Boolean @default(true)
-  codeHighlight Boolean @default(true)
-  persistentMemory Boolean @default(false)
-  emailUpdates  Boolean @default(true)
-  emailMarketing Boolean @default(false)
-  browserNotifs Boolean @default(false)
-  usageAlerts   Boolean @default(true)
-  analytics     Boolean @default(true)
-  usageData     Boolean @default(false)
-  crashReports  Boolean @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  theme            String   @default("system")
+  language         String   @default("en")
+  autoTitle        Boolean  @default(true)
+  enterToSend      Boolean  @default(false)
+  showSuggestions  Boolean  @default(true)
+  compactMode      Boolean  @default(false)
+  reducedMotion    Boolean  @default(false)
+  streaming        Boolean  @default(true)
+  codeHighlight    Boolean  @default(true)
+  persistentMemory Boolean  @default(false)
+  emailUpdates     Boolean  @default(true)
+  emailMarketing   Boolean  @default(false)
+  browserNotifs    Boolean  @default(false)
+  usageAlerts      Boolean  @default(true)
+  analytics        Boolean  @default(true)
+  usageData        Boolean  @default(false)
+  crashReports     Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Memory {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  content   String
-  tags      String[]
-  category  String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String            @id @default(cuid())
+  userId           String
+  title            String
+  content          String
+  tags             String[]
+  category         String?
+  metadata         Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  // memoryEmbeddings MemoryEmbedding[] // Requires pgvector extension
 
   @@index([userId])
   @@index([userId, category])
@@ -367,7 +415,49 @@ model Memory {
 }
 
 model OnboardingData {
-  id String @id @default(cuid())
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  profession String
+  source     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Notification {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String
+  description  String
+  read         Boolean   @default(false)
+  archived     Boolean   @default(false)
+  snoozedUntil DateTime?
+  accent       String    @default("bg-blue-400") // CSS color class
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, read, archived])
+}
+
+model NotificationPrefs {
+  id         String  @id @default(cuid())
+  userId     String  @unique
+  newFeature Boolean @default(true)
+  credits    Boolean @default(true)
+  system     Boolean @default(false)
+  tips       Boolean @default(true)
+  security   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------------------
@@ -375,52 +465,52 @@ model OnboardingData {
 // ---------------------------------------------------------------------------
 
 model Plan {
-  id            String    @id // "free" | "basic" | "pro" | "enterprise"
-  tier          PlanTier  @unique
+  id   String   @id // "free" | "basic" | "pro" | "enterprise"
+  tier PlanTier @unique
 
   // Display
-  name          String
-  description   String    @db.Text
+  name        String
+  description String @db.Text
 
   // Pricing (in cents)
-  price         Int       @default(0) // 0 = free
+  price Int @default(0) // 0 = free
 
-  // Stripe integration
-  stripePriceId String?   @unique // Stripe Price ID (null for free)
-  stripeProductId String? // Stripe Product ID
+  // Polar integration
+  polarPriceId   String? @unique // Polar Price ID (null for free)
+  polarProductId String? // Polar Product ID
 
   // Limits
-  credits       Int       @default(25)
-  maxChats      Int       @default(100)  // -1 = unlimited
-  maxProjects   Int       @default(2)
-  maxMessages   Int       @default(100)  // -1 = unlimited
+  credits     Int @default(25)
+  maxChats    Int @default(100) // -1 = unlimited
+  maxProjects Int @default(2)
+  maxMessages Int @default(100) // -1 = unlimited
 
   // Feature-specific limits
-  maxMemoryItems Int      @default(0)    // 0 = not allowed, -1 = unlimited
-  maxBranchesPerChat Int @default(0)    // 0 = not allowed
-  maxFolders    Int       @default(0)    // 0 = not allowed, -1 = unlimited
-  maxAttachmentsPerChat Int @default(0)  // 0 = not allowed
-  maxFileSizeMb Int       @default(0)    // 0 = not allowed
-  canExport     Boolean   @default(false)
-  canApiAccess  Boolean   @default(false)
+  maxMemoryItems        Int     @default(0) // 0 = not allowed, -1 = unlimited
+  maxBranchesPerChat    Int     @default(0) // 0 = not allowed
+  maxFolders            Int     @default(0) // 0 = not allowed, -1 = unlimited
+  maxAttachmentsPerChat Int     @default(0) // 0 = not allowed
+  maxFileSizeMb         Int     @default(0) // 0 = not allowed
+  canExport             Boolean @default(false)
+  canApiAccess          Boolean @default(false)
 
   // Features (feature flags for this plan)
-  features      String[]  @default([])
+  features String[] @default([])
 
   // Scalability fields
-  metadata      Json?     // extra data, add/remove without schema changes
-  sortOrder     Int       @default(0)  // for admin ordering
+  metadata  Json? // extra data, add/remove without schema changes
+  sortOrder Int   @default(0) // for admin ordering
 
   // Status
-  isActive      Boolean   @default(true)
-  isVisible     Boolean   @default(true)  // hide from pricing page but keep for existing users
-  isDefault     Boolean   @default(false) // default plan for new users
+  isActive  Boolean @default(true)
+  isVisible Boolean @default(true) // hide from pricing page but keep for existing users
+  isDefault Boolean @default(false) // default plan for new users
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  users         User[]    @relation("UserPlan")
+  users         User[]         @relation("UserPlan")
   subscriptions Subscription[]
 
   @@index([tier])
@@ -428,40 +518,153 @@ model Plan {
 }
 
 model Subscription {
-  id            String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // User
-  userId        String    @unique
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Plan
-  planId        String
-  plan          Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  // Stripe
-  stripeSubId   String?   @unique // Stripe subscription ID
-  stripeCustomerId String? // Stripe customer ID
+  // Polar
+  polarSubscriptionId String? @unique // Polar subscription ID
+  polarCustomerId     String? // Polar customer ID
 
   // Status
-  status        SubscriptionStatus @default(ACTIVE)
+  status SubscriptionStatus @default(ACTIVE)
 
   // Billing
   currentPeriodStart DateTime  @default(now())
   currentPeriodEnd   DateTime
-  cancelAtPeriodEnd Boolean   @default(false)
+  cancelAtPeriodEnd  Boolean   @default(false)
   canceledAt         DateTime?
 
   // Legacy support (old flat-rate subscriptions)
-  legacyPlanId   String?   // old "basic"/"pro" plan identifier
+  legacyPlanId String? // old "basic"/"pro" plan identifier
 
   // Scalability
-  metadata      Json?     // extra data without schema changes
+  metadata Json? // extra data without schema changes
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
-  @@index([stripeCustomerId])
+  @@index([polarCustomerId])
   @@index([currentPeriodEnd])
 }
+
+// ---------------------------------------------------------------------------
+// Push Notifications
+// ---------------------------------------------------------------------------
+
+model PushSubscription {
+  id       String @id @default(cuid())
+  userId   String
+  endpoint String // Push subscription endpoint URL
+  p256dh   String // User's public key for encryption
+  auth     String // User's auth secret for encryption
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Composite unique - user can have multiple devices but same endpoint per device
+  @@unique([userId, endpoint])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// MCP Catalog (Pre-configured connectors marketplace)
+// ---------------------------------------------------------------------------
+
+model McpCatalogItem {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   // "dev" | "productivity" | "design" | "crm" | "payments" | "database" | "search" | "data" | "travel" | "email" | "shopping" | "other"
+  url         String   @unique
+  authType    String   @default("open") // "oauth" | "apikey" | "open"
+  maintainer  String
+  maintainerUrl String
+  customIcon  String?
+  isFeatured   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isFeatured])
+  @@index([isActive])
+}
+
+model McpUserServer {
+  id                         String    @id @default(cuid())
+  userId                     String
+  name                       String
+  transportType              String    @default("http")
+  url                        String
+  authType                   String    @default("none")
+  encryptedCredentials       String?
+  oauthIssuerUrl             String?
+  oauthAuthorizationUrl       String?
+  oauthTokenUrl              String?
+  oauthScopes                String?
+  oauthClientId              String?
+  oauthClientSecretEncrypted String?
+  oauthAccessTokenEncrypted  String?
+  oauthRefreshTokenEncrypted String?
+  oauthAccessTokenExpiresAt  DateTime?
+  oauthConnectedAt           DateTime?
+  oauthError                String?
+  isEnabled                  Boolean   @default(true)
+  disabledTools             String[]  @default([])
+  lastTestedAt               DateTime?
+  lastError                  String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isEnabled])
+}
+
+// ---------------------------------------------------------------------------
+// RAG Embeddings (pgvector)
+// ---------------------------------------------------------------------------
+
+// NOTE: vector(1536) requires pgvector extension to be installed on the database
+// CREATE EXTENSION vector;
+// If pgvector is not available, these models will fail to migrate.
+
+// model FileChunk {
+//   id         String                      @id @default(cuid())
+//   fileId     String
+//   chunkIndex Int
+//   content    String
+//   embedding  Unsupported("vector(1536)") // Cohere embed-v7-multilingual uses 1536 dims
+//   tokenCount Int
+//
+//   createdAt DateTime @default(now())
+//
+//   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+//
+//   @@index([fileId])
+//   @@index([fileId, chunkIndex])
+// }
+//
+// model MemoryEmbedding {
+//   id         String                      @id @default(cuid())
+//   memoryId   String
+//   content    String
+//   embedding  Unsupported("vector(1536)")
+//   tokenCount Int
+//
+//   createdAt DateTime @default(now())
+//
+//   memory Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+//
+//   @@index([memoryId])
+// }

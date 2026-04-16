@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserChats, createChat } from "@/lib/stack-server";
-import { getOrCreateUser } from "@/lib/auth";
+import { getOrCreateUser, AccountDeactivatedError } from "@/lib/auth";
 import { rateLimit, rateLimitResponse } from "@/services/rate-limit.service";
 import { createChatSchema } from "@/schemas/validation";
 import { logger } from "@/lib/logger";
+import { publishChatCreated } from "@/services/chat-pubsub.service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +32,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -70,6 +74,9 @@ export async function POST(request: NextRequest) {
 
     const chat = await createChat(user.id, { projectId, firstMessage });
 
+    // Publish new chat event for real-time sync
+    await publishChatCreated(chat, user.id);
+
     return NextResponse.json(
       {
         id: chat.id,
@@ -81,6 +88,9 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

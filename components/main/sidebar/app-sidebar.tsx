@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 
 import { Sidebar, SidebarContent, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebarHeader } from "./sidebar-header";
@@ -17,6 +18,7 @@ import DeleteProjectModal from "./dialogs/projects/delete-project";
 import { useUser } from "@stackframe/stack";
 
 export function AppSidebar() {
+  const router = useRouter();
   const { state } = useSidebar();
   const user = useUser();
   const [activeTab, setActiveTab] = React.useState<TabId>("chats");
@@ -36,6 +38,13 @@ export function AppSidebar() {
 
   useKeyboardShortcut("k", openSearch, { meta: true, ignoreInputs: false, enabled: !!user });
   useKeyboardShortcut("k", openSearch, { ctrl: true, ignoreInputs: false, enabled: !!user });
+
+  const createNewChat = React.useCallback(() => {
+    router.push("/home");
+  }, [router]);
+
+  useKeyboardShortcut("n", createNewChat, { meta: true, shift: true, ignoreInputs: true, disableOnDialog: true, enabled: !!user });
+  useKeyboardShortcut("n", createNewChat, { ctrl: true, shift: true, ignoreInputs: true, disableOnDialog: true, enabled: !!user });
 
   const openCreateProject = React.useCallback(() => {
     setCreateProjectOpen(true);

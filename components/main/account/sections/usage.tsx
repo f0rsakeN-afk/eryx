@@ -10,6 +10,10 @@ interface AccountData {
     projects: number;
     messages: number;
   };
+  monthlyUsage: {
+    chats: number;
+    messages: number;
+  };
 }
 
 async function fetchAccount(): Promise<AccountData> {
@@ -33,9 +37,10 @@ export const UsageSection = React.memo(function UsageSection() {
   }
 
   const stats = [
-    { label: "Messages sent", value: (data?.usage.messages || 0).toLocaleString(), sub: "this month" },
-    { label: "Chats", value: (data?.usage.chats || 0).toLocaleString(), sub: "total" },
-    { label: "Projects", value: (data?.usage.projects || 0).toLocaleString(), sub: "total" },
+    { label: "Messages", value: (data?.monthlyUsage?.messages || 0).toLocaleString(), sub: "this month" },
+    { label: "Chats", value: (data?.monthlyUsage?.chats || 0).toLocaleString(), sub: "this month" },
+    { label: "Total chats", value: (data?.usage?.chats || 0).toLocaleString(), sub: "all time" },
+    { label: "Total projects", value: (data?.usage?.projects || 0).toLocaleString(), sub: "all time" },
   ] as const;
 
   return (
@@ -65,18 +70,6 @@ export const UsageSection = React.memo(function UsageSection() {
         ))}
       </div>
 
-      {/* Daily usage chart placeholder */}
-      <div className="space-y-1.5">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
-          Over time
-        </p>
-        <div className="rounded-xl border border-border/60 bg-muted/20 h-28 flex items-center justify-center">
-          <span className="text-[12px] text-muted-foreground/50">
-            Usage over time
-          </span>
-        </div>
-      </div>
-
       {/* Top activity */}
       <div className="space-y-1.5">
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
@@ -84,9 +77,9 @@ export const UsageSection = React.memo(function UsageSection() {
         </p>
         <div className="rounded-lg border border-border/60 bg-muted/20 px-3 divide-y divide-border/40">
           {[
-            { color: "bg-blue-500", label: "Chat completions", count: (data?.usage.messages || 0).toLocaleString() },
-            { color: "bg-purple-500", label: "Chats", count: (data?.usage.chats || 0).toLocaleString() },
-            { color: "bg-amber-400", label: "Projects", count: (data?.usage.projects || 0).toLocaleString() },
+            { color: "bg-blue-500", label: "Messages this month", count: (data?.monthlyUsage?.messages || 0).toLocaleString() },
+            { color: "bg-purple-500", label: "Chats this month", count: (data?.monthlyUsage?.chats || 0).toLocaleString() },
+            { color: "bg-amber-400", label: "Projects", count: (data?.usage?.projects || 0).toLocaleString() },
           ].map(({ color, label, count }) => (
             <div
               key={label}

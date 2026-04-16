@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getChatMessages, addChatMessage } from "@/lib/stack-server";
 import { validateAuth } from "@/lib/auth";
+import { publishMessageNew } from "@/services/chat-pubsub.service";
 
 export async function GET(
   request: NextRequest,
@@ -42,7 +43,7 @@ export async function POST(
 
     const { id: chatId } = await params;
     const body = await request.json();
-    const { role, content } = body;
+    const { role, content, fileIds } = body;
 
     if (!role || !content) {
       return NextResponse.json(
@@ -58,7 +59,15 @@ export async function POST(
       );
     }
 
-    const message = await addChatMessage(chatId, user.id, { role, content });
+    const message = await addChatMessage(chatId, user.id, { role, content }, fileIds);
+
+    // Publish new message event for real-time sync
+    await publishMessageNew(chatId, user.id, {
+      id: message.id,
+      role: message.role || "user",
+      content: message.content,
+      createdAt: message.createdAt,
+    });
 
     return NextResponse.json(
       {

@@ -2,11 +2,12 @@
  * Project Files API
  * GET /api/projects/[id]/files - List files in project
  * POST /api/projects/[id]/files - Add file to project
+ * DELETE /api/projects/[id]/files?fileId=xxx - Remove file from project
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getOrCreateUser } from "@/lib/auth";
+import { getOrCreateUser, AccountDeactivatedError } from "@/lib/auth";
 import { invalidateProjectContext } from "@/services/project-context.service";
 
 export async function GET(
@@ -44,6 +45,9 @@ export async function GET(
 
     return NextResponse.json({ files });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -105,12 +109,79 @@ export async function POST(
 
     return NextResponse.json({ file: updatedFile });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error("Add project file error:", error);
     return NextResponse.json(
       { error: "Failed to add file to project" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getOrCreateUser(request);
+    const { id: projectId } = await params;
+    const { searchParams } = new URL(request.url);
+    const fileId = searchParams.get("fileId");
+
+    if (!fileId) {
+      return NextResponse.json(
+        { error: "fileId query parameter is required" },
+        { status: 400 }
+      );
+    }
+
+    // Verify project ownership
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId: user.id },
+    });
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // Verify file is in this project
+    const file = await prisma.file.findFirst({
+      where: { id: fileId, projectId },
+    });
+
+    if (!file) {
+      return NextResponse.json({ error: "File not found in project" }, { status: 404 });
+    }
+
+    // Remove file from project (clear projectId)
+    await prisma.file.update({
+      where: { id: fileId },
+      data: { projectId: null },
+    });
+
+    // Invalidate project context cache
+    await invalidateProjectContext(projectId);
+
+    // Invalidate both project files and global files list
+    // (we can't directly call queryClient.invalidateQueries here, but the API response
+    // will trigger re-fetch on client side since we're returning fresh data)
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    console.error("Remove project file error:", error);
+    return NextResponse.json(
+      { error: "Failed to remove file from project" },
       { status: 500 }
     );
   }

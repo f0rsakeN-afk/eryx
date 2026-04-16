@@ -3,7 +3,9 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams, useParams } from "next/navigation";
+import { toast } from "@/components/ui/sileo-toast";
 import { useChatMessages } from "@/hooks/use-chat-messages";
+import { useChatStream } from "@/hooks/useChatStream";
 import { ChatInput } from "@/components/main/home/chat-input";
 import { ChatHeader } from "@/components/main/chat/chat-header";
 import type { Message } from "@/services/chat.service";
@@ -11,6 +13,7 @@ import { SplitViewContext } from "@/components/main/chat/split-view-context";
 import { useOptimizedScroll } from "@/hooks/use-optimized-scroll";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MemoryDialog } from "@/components/main/memory/memory-dialog";
+import { ChatErrorBoundary } from "@/components/ui/error-boundary";
 // import { cn } from "@/lib/utils";
 // import {
 //   MessageSkeleton,
@@ -369,6 +372,19 @@ function ChatPageInner() {
     skipFirstMessage: shouldTriggerAI,
   });
 
+  // Subscribe to real-time message updates from other devices
+  useChatStream({
+    chatId,
+    onNewMessage: (message) => {
+      // Only show toast if message is from AI (someone else using the account)
+      if (message.role === "assistant") {
+        toast("New AI response", {
+          description: message.content.slice(0, 100) + (message.content.length > 100 ? "..." : ""),
+        });
+      }
+    },
+  });
+
   // Auto-trigger AI response for first message when navigating from home
   React.useEffect(() => {
     if (
@@ -388,9 +404,22 @@ function ChatPageInner() {
   const handleSubmit = React.useCallback(
     async (value: string) => {
       setInput("");
-      await sendUserMessage(value);
+      try {
+        await sendUserMessage(value, webSearch ? "web" : "chat");
+      } catch (err) {
+        const error = err as { code?: string; message?: string; required?: number; current?: number; upgradeTo?: string };
+        if (error.code === "CREDIT_ERROR") {
+          toast.error("Out of credits", {
+            description: error.message || `You need more credits to continue.`,
+            action: {
+              label: "Upgrade to Pro",
+              onClick: () => window.dispatchEvent(new CustomEvent("open-pricing-dialog")),
+            },
+          });
+        }
+      }
     },
-    [sendUserMessage],
+    [sendUserMessage, webSearch],
   );
 
   if (isLoading) return <div />;
@@ -417,6 +446,8 @@ function ChatPageInner() {
               onSubmit={handleSubmit}
               placeholder="Ask a follow-up…"
               onOpenMemory={() => setMemoryDialogOpen(true)}
+              webSearchEnabled={webSearch}
+              onWebSearchToggle={(enabled) => setWebSearch(enabled)}
             />
           </div>
         </div>
@@ -446,8 +477,10 @@ export default function ChatPage() {
   );
 
   return (
-    <SplitViewProvider>
-      <ChatPageInner />
-    </SplitViewProvider>
+    <ChatErrorBoundary>
+      <SplitViewProvider>
+        <ChatPageInner />
+      </SplitViewProvider>
+    </ChatErrorBoundary>
   );
 }

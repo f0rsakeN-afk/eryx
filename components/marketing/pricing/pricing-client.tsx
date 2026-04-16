@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sileo-toast";
 
 interface Plan {
   name: string;
@@ -45,7 +45,7 @@ const FEATURE_LABELS: Record<string, string> = {
 };
 
 async function fetchPlans(): Promise<PlansData> {
-  const res = await fetch("/api/stripe/plans");
+  const res = await fetch("/api/polar/plans");
   if (!res.ok) throw new Error("Failed to fetch plans");
   return res.json();
 }

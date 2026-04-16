@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getOrCreateUser } from "@/lib/auth";
+import { getOrCreateUser, AccountDeactivatedError } from "@/lib/auth";
+import redis, { KEYS } from "@/lib/redis";
+
+/**
+ * Invalidate projects cache
+ */
+async function invalidateProjectsCache(userId: string): Promise<void> {
+  try {
+    await redis.del(KEYS.userProjects(userId));
+  } catch {
+    // Redis error, ignore
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -39,6 +51,9 @@ export async function GET(
       pinnedAt: project.pinnedAt?.toISOString() ?? null,
     });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -92,6 +107,9 @@ export async function PATCH(
       },
     });
 
+    // Invalidate project list cache
+    await invalidateProjectsCache(user.id);
+
     return NextResponse.json({
       ...project,
       createdAt: project.createdAt.toISOString(),
@@ -100,6 +118,9 @@ export async function PATCH(
       pinnedAt: project.pinnedAt?.toISOString() ?? null,
     });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -133,8 +154,14 @@ export async function DELETE(
       where: { id },
     });
 
+    // Invalidate project list cache
+    await invalidateProjectsCache(user.id);
+
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

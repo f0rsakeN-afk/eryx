@@ -65,30 +65,53 @@ export async function PATCH(request: NextRequest) {
 
     const data = parsed.data;
 
-    const settings = await prisma.settings.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        theme: data.theme as typeof DEFAULT_SETTINGS.theme || DEFAULT_SETTINGS.theme,
-        language: data.language || DEFAULT_SETTINGS.language,
-        autoTitle: data.autoTitle ?? DEFAULT_SETTINGS.autoTitle,
-        enterToSend: data.enterToSend ?? DEFAULT_SETTINGS.enterToSend,
-        showSuggestions: data.showSuggestions ?? DEFAULT_SETTINGS.showSuggestions,
-        compactMode: data.compactMode ?? DEFAULT_SETTINGS.compactMode,
-        reducedMotion: data.reducedMotion ?? DEFAULT_SETTINGS.reducedMotion,
-        streaming: data.streaming ?? DEFAULT_SETTINGS.streaming,
-        codeHighlight: data.codeHighlight ?? DEFAULT_SETTINGS.codeHighlight,
-        persistentMemory: data.persistentMemory ?? DEFAULT_SETTINGS.persistentMemory,
-        emailUpdates: data.emailUpdates ?? DEFAULT_SETTINGS.emailUpdates,
-        emailMarketing: data.emailMarketing ?? DEFAULT_SETTINGS.emailMarketing,
-        browserNotifs: data.browserNotifs ?? DEFAULT_SETTINGS.browserNotifs,
-        usageAlerts: data.usageAlerts ?? DEFAULT_SETTINGS.usageAlerts,
-        analytics: data.analytics ?? DEFAULT_SETTINGS.analytics,
-        usageData: data.usageData ?? DEFAULT_SETTINGS.usageData,
-        crashReports: data.crashReports ?? DEFAULT_SETTINGS.crashReports,
-      },
-      update: data,
+    // Check if user exists first
+    const userExists = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { id: true },
     });
+
+    if (!userExists) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Check if settings already exist
+    const existingSettings = await prisma.settings.findUnique({
+      where: { userId: user.id },
+    });
+
+    let settings;
+    if (existingSettings) {
+      // Update only the fields provided
+      settings = await prisma.settings.update({
+        where: { userId: user.id },
+        data,
+      });
+    } else {
+      // Create with defaults + provided data
+      settings = await prisma.settings.create({
+        data: {
+          userId: user.id,
+          theme: data.theme as typeof DEFAULT_SETTINGS.theme || DEFAULT_SETTINGS.theme,
+          language: data.language || DEFAULT_SETTINGS.language,
+          autoTitle: data.autoTitle ?? DEFAULT_SETTINGS.autoTitle,
+          enterToSend: data.enterToSend ?? DEFAULT_SETTINGS.enterToSend,
+          showSuggestions: data.showSuggestions ?? DEFAULT_SETTINGS.showSuggestions,
+          compactMode: data.compactMode ?? DEFAULT_SETTINGS.compactMode,
+          reducedMotion: data.reducedMotion ?? DEFAULT_SETTINGS.reducedMotion,
+          streaming: data.streaming ?? DEFAULT_SETTINGS.streaming,
+          codeHighlight: data.codeHighlight ?? DEFAULT_SETTINGS.codeHighlight,
+          persistentMemory: data.persistentMemory ?? DEFAULT_SETTINGS.persistentMemory,
+          emailUpdates: data.emailUpdates ?? DEFAULT_SETTINGS.emailUpdates,
+          emailMarketing: data.emailMarketing ?? DEFAULT_SETTINGS.emailMarketing,
+          browserNotifs: data.browserNotifs ?? DEFAULT_SETTINGS.browserNotifs,
+          usageAlerts: data.usageAlerts ?? DEFAULT_SETTINGS.usageAlerts,
+          analytics: data.analytics ?? DEFAULT_SETTINGS.analytics,
+          usageData: data.usageData ?? DEFAULT_SETTINGS.usageData,
+          crashReports: data.crashReports ?? DEFAULT_SETTINGS.crashReports,
+        },
+      });
+    }
 
     // Invalidate cache so next request gets fresh data
     await invalidateUserSettingsCache(user.id);

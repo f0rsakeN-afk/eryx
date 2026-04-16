@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
+import { queueEmail } from "@/services/queue.service";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +22,35 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, reason: "no_email" });
   }
 
+  let userCreated = false;
+
   try {
-    await prisma.user.upsert({
+    const existingUser = await prisma.user.findUnique({
       where: { stackId: user.id },
-      update: { email: user.primaryEmail },
-      create: { stackId: user.id, email: user.primaryEmail, role: "USER" },
     });
+
+    if (existingUser) {
+      // Update email if changed
+      if (existingUser.email !== user.primaryEmail) {
+        await prisma.user.update({
+          where: { id: existingUser.id },
+          data: { email: user.primaryEmail },
+        });
+      }
+    } else {
+      // Create new user
+      await prisma.user.create({
+        data: { stackId: user.id, email: user.primaryEmail, role: "USER" },
+      });
+      userCreated = true;
+
+      // Send welcome email for new users
+      queueEmail(user.primaryEmail, "welcome", {
+        name: user.primaryEmail.split("@")[0] || "User",
+      }).catch((err) => {
+        console.error("[InitUser] Failed to queue welcome email:", err);
+      });
+    }
   } catch (err) {
     // Unique constraint — another request already created it
     if ((err as any)?.code === "P2002") {

@@ -9,7 +9,7 @@ import { ShineBorder } from "@/components/ui/shine-border";
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sileo-toast";
 
 interface PricingDialogProps {
   isOpen: boolean;
@@ -53,7 +53,7 @@ const FEATURE_LABELS: Record<string, string> = {
 };
 
 async function fetchPlans(): Promise<PlansData> {
-  const res = await fetch("/api/stripe/plans");
+  const res = await fetch("/api/polar/plans");
   if (!res.ok) throw new Error("Failed to fetch plans");
   return res.json();
 }

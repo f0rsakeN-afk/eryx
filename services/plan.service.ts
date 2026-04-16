@@ -12,8 +12,8 @@ export interface PlanData {
   name: string;
   description: string;
   price: number;
-  stripePriceId: string | null;
-  stripeProductId: string | null;
+  polarPriceId: string | null;
+  polarProductId: string | null;
   credits: number;
   maxChats: number;
   maxProjects: number;
@@ -43,8 +43,8 @@ export async function getPlan(planId: string): Promise<PlanData | null> {
     name: plan.name,
     description: plan.description,
     price: plan.price,
-    stripePriceId: plan.stripePriceId,
-    stripeProductId: plan.stripeProductId,
+    polarPriceId: plan.polarPriceId,
+    polarProductId: plan.polarProductId, // Polar not yet fully integrated with DB plans
     credits: plan.credits,
     maxChats: plan.maxChats,
     maxProjects: plan.maxProjects,
@@ -77,8 +77,8 @@ export async function getAllActivePlans(): Promise<PlanData[]> {
     name: plan.name,
     description: plan.description,
     price: plan.price,
-    stripePriceId: plan.stripePriceId,
-    stripeProductId: plan.stripeProductId,
+    polarPriceId: plan.polarPriceId,
+    polarProductId: plan.polarProductId,
     credits: plan.credits,
     maxChats: plan.maxChats,
     maxProjects: plan.maxProjects,
@@ -112,8 +112,8 @@ export async function getDefaultPlan(): Promise<PlanData | null> {
     name: plan.name,
     description: plan.description,
     price: plan.price,
-    stripePriceId: plan.stripePriceId,
-    stripeProductId: plan.stripeProductId,
+    polarPriceId: plan.polarPriceId,
+    polarProductId: plan.polarProductId, // Polar not yet fully integrated with DB plans
     credits: plan.credits,
     maxChats: plan.maxChats,
     maxProjects: plan.maxProjects,
@@ -144,8 +144,8 @@ export async function getPlanByTier(tier: PlanTier): Promise<PlanData | null> {
     name: plan.name,
     description: plan.description,
     price: plan.price,
-    stripePriceId: plan.stripePriceId,
-    stripeProductId: plan.stripeProductId,
+    polarPriceId: plan.polarPriceId,
+    polarProductId: plan.polarProductId, // Polar not yet fully integrated with DB plans
     credits: plan.credits,
     maxChats: plan.maxChats,
     maxProjects: plan.maxProjects,

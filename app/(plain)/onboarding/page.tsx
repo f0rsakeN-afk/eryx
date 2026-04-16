@@ -21,6 +21,8 @@ import {
   Mic,
   BookOpen,
   Search,
+  ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { ArchitectureDemo } from "@/components/onboarding/architecture-demo";
 import { Button } from "@/components/ui/button";
@@ -73,8 +75,8 @@ const STEPS = [
   },
   {
     id: "source",
-    title: "Help us grow",
-    description: "How did you hear about Eryx?",
+    title: "How did you find us?",
+    description: "Help us understand how to reach more people like you.",
     icon: Share2,
     type: "choice",
     field: "source",
@@ -141,8 +143,8 @@ const STEPS = [
   },
   {
     id: "finish",
-    title: "Welcome to Eryx",
-    description: "Thank you for being part of the journey.",
+    title: "You're all set",
+    description: "Your workspace is ready. Start exploring.",
     icon: Boxes,
   },
 ];
@@ -150,19 +152,48 @@ const STEPS = [
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     profession: "",
     source: "",
   });
 
-  const nextStep = useCallback(() => {
-    if (currentStep < STEPS.length - 1) {
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      console.log("Onboarding Data:", formData);
+  const step = STEPS[currentStep];
+
+  const isChoiceStep = step.type === "choice";
+  const canProceed = !isChoiceStep || !!formData[step.field as keyof typeof formData];
+  const isLastStep = currentStep === STEPS.length - 1;
+
+  const handleComplete = useCallback(async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        router.push("/home");
+      } else {
+        console.error("Onboarding failed");
+        router.push("/home");
+      }
+    } catch (error) {
+      console.error("Onboarding error:", error);
       router.push("/home");
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [currentStep, formData, router]);
+  }, [formData, router]);
+
+  const nextStep = useCallback(() => {
+    if (isLastStep) {
+      handleComplete();
+    } else {
+      setCurrentStep((prev) => prev + 1);
+    }
+  }, [isLastStep, handleComplete]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 0) {
@@ -170,11 +201,26 @@ export default function OnboardingPage() {
     }
   }, [currentStep]);
 
-  const step = STEPS[currentStep];
-
   return (
     <main className="min-h-screen bg-background flex flex-col items-center justify-center p-6 py-12 overflow-y-auto">
       <div className="w-full max-w-2xl flex flex-col items-center gap-10">
+        {/* Progress indicator */}
+        <div className="flex items-center gap-2">
+          {STEPS.map((_, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                idx === currentStep
+                  ? "w-8 bg-primary"
+                  : idx < currentStep
+                  ? "w-1.5 bg-primary/50"
+                  : "w-1.5 bg-muted"
+              )}
+            />
+          ))}
+        </div>
+
         <div className="w-full flex flex-col items-center gap-6">
           {/* Text Content */}
           <div className="space-y-2 flex flex-col items-center justify-center text-center">
@@ -188,16 +234,15 @@ export default function OnboardingPage() {
 
           {/* Visual Content Area */}
           <div className="min-h-[280px] w-full flex items-center justify-center mt-2">
-            {step.type === "choice" ? (
+            {isChoiceStep ? (
               <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-[550px]">
                 {step.options?.map((opt) => {
                   const Icon = opt.icon || Globe;
                   const isSelected =
                     formData[step.field as keyof typeof formData] === opt.id;
                   return (
-                    <Button
+                    <button
                       key={opt.id}
-                      variant={isSelected ? "default" : "outline"}
                       onClick={() =>
                         setFormData((prev) => ({
                           ...prev,
@@ -205,20 +250,20 @@ export default function OnboardingPage() {
                         }))
                       }
                       className={cn(
-                        "flex items-center gap-3 px-5 h-12 rounded-full text-[14.5px] border font-medium transition-all duration-200 justify-start",
+                        "flex items-center gap-3 px-5 h-12 rounded-full text-[14.5px] border font-medium transition-all duration-200 justify-start bg-background",
                         isSelected
-                          ? "shadow-lg shadow-primary/20"
-                          : "bg-muted/5 border-border hover:border-primary/40 text-muted-foreground",
+                          ? "border-primary bg-primary/5 text-primary shadow-lg shadow-primary/10"
+                          : "border-border hover:border-primary/40 text-muted-foreground hover:text-foreground"
                       )}
                     >
                       <Icon
                         className={cn(
                           "w-4 h-4 shrink-0 transition-colors",
-                          !isSelected && "text-muted-foreground",
+                          isSelected ? "text-primary" : "text-muted-foreground"
                         )}
                       />
                       <span className="truncate">{opt.label}</span>
-                    </Button>
+                    </button>
                   );
                 })}
               </div>
@@ -233,18 +278,28 @@ export default function OnboardingPage() {
           <div className="flex flex-col items-center gap-4 w-full">
             <Button
               onClick={nextStep}
-              disabled={
-                step.type === "choice" &&
-                !formData[step.field as keyof typeof formData]
-              }
-              className="rounded-full h-14 w-full font-bold text-lg transition-all shadow-xl bg-primary hover:bg-primary/95 text-primary-foreground disabled:opacity-30 disabled:grayscale"
+              disabled={!canProceed || isSubmitting}
+              className="rounded-full h-14 w-full font-bold text-lg transition-all shadow-xl bg-primary hover:bg-primary/95 text-primary-foreground disabled:opacity-30 disabled:grayscale gap-2"
             >
-              {currentStep === STEPS.length - 1
-                ? "Start Designing"
-                : "Continue"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Setting up...
+                </>
+              ) : isLastStep ? (
+                <>
+                  Launch workspace
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </Button>
-            
-            {currentStep > 0 && (
+
+            {currentStep > 0 && !isSubmitting && (
               <button
                 onClick={prevStep}
                 className="text-[15px] text-muted-foreground hover:text-foreground font-medium transition-colors"

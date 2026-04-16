@@ -8,6 +8,7 @@ import { stackServerApp } from "@/src/stack/server";
 import { completeMultipartUpload, getPresignedDownloadUrl } from "@/services/s3.service";
 import { extractFileContent, getContentPreview, isExtractionSupported } from "@/services/extraction.service";
 import { invalidateProjectContext } from "@/services/project-context.service";
+import { createFileChunks } from "@/lib/stack-server";
 import prisma from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -73,6 +74,11 @@ export async function POST(request: NextRequest) {
             tokenCount: result.tokenCount,
           },
         });
+
+        // Create embeddings for RAG if extraction succeeded
+        if (result.extractionMethod !== "failed" && result.text) {
+          await createFileChunks(fileId, result.text);
+        }
 
         // Invalidate project context cache if attached to project
         if (file.projectId) {

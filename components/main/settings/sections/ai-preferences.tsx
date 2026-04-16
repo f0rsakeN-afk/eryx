@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/sileo-toast";
 
 function SettingRow({
   label,
@@ -34,9 +42,20 @@ interface Settings {
   persistentMemory: boolean;
 }
 
+interface CustomizeData {
+  detailLevel: string;
+  model?: string;
+}
+
 async function fetchSettings(): Promise<Settings> {
   const res = await fetch("/api/settings");
   if (!res.ok) throw new Error("Failed to fetch settings");
+  return res.json();
+}
+
+async function fetchCustomize(): Promise<CustomizeData> {
+  const res = await fetch("/api/customize");
+  if (!res.ok) throw new Error("Failed to fetch customize");
   return res.json();
 }
 
@@ -50,14 +69,36 @@ async function updateSetting(key: string, value: boolean): Promise<Settings> {
   return res.json();
 }
 
+async function updateDetailLevel(detailLevel: string): Promise<CustomizeData> {
+  const res = await fetch("/api/customize", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ detailLevel }),
+  });
+  if (!res.ok) throw new Error("Failed to update detail level");
+  return res.json();
+}
+
 export function AiPreferencesSection() {
   const queryClient = useQueryClient();
   const [localSettings, setLocalSettings] = useState<Settings | null>(null);
+  const [detailLevel, setDetailLevel] = useState<string>("balanced");
 
-  const { data: settings, isLoading } = useQuery({
+  const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["settings"],
     queryFn: fetchSettings,
   });
+
+  const { data: customizeData, isLoading: customizeLoading } = useQuery({
+    queryKey: ["customize"],
+    queryFn: fetchCustomize,
+  });
+
+  useEffect(() => {
+    if (customizeData?.detailLevel) {
+      setDetailLevel(customizeData.detailLevel);
+    }
+  }, [customizeData]);
 
   const mutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: boolean }) => {
@@ -69,13 +110,32 @@ export function AiPreferencesSection() {
     },
   });
 
+  const detailLevelMutation = useMutation({
+    mutationFn: async (level: string) => {
+      return updateDetailLevel(level);
+    },
+    onSuccess: (newData) => {
+      queryClient.setQueryData(["customize"], newData);
+      toast.success("Response style updated");
+    },
+    onError: () => {
+      toast.error("Failed to update response style");
+    },
+  });
+
   const onUpdate = useCallback((key: keyof Settings, value: boolean) => {
     mutation.mutate({ key, value });
   }, [mutation]);
 
+  const onDetailLevelChange = useCallback((value: string | null) => {
+    if (value === null) return;
+    setDetailLevel(value);
+    detailLevelMutation.mutate(value);
+  }, [detailLevelMutation]);
+
   const displaySettings = localSettings || settings;
 
-  if (isLoading || !displaySettings) {
+  if (settingsLoading || customizeLoading || !displaySettings) {
     return (
       <div className="space-y-5">
         <div className="h-20 rounded-lg bg-muted/20 animate-pulse" />
@@ -103,11 +163,16 @@ export function AiPreferencesSection() {
             label="Default model"
             description="Model used for new conversations."
           >
-            <select className="h-7 w-36 text-[12px] rounded-md border border-input bg-background px-2">
-              <option value="eryx-1">Eryx-1</option>
-              <option value="eryx-1-fast">Eryx-1 Fast</option>
-              <option value="eryx-1-pro">Eryx-1 Pro</option>
-            </select>
+            <Select value="eryx-1" onValueChange={(val) => console.log("model:", val)}>
+              <SelectTrigger className="h-7 w-36 text-[12px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="eryx-1">Eryx-1</SelectItem>
+                <SelectItem value="eryx-1-fast">Eryx-1 Fast</SelectItem>
+                <SelectItem value="eryx-1-pro">Eryx-1 Pro</SelectItem>
+              </SelectContent>
+            </Select>
           </SettingRow>
         </div>
       </div>
@@ -121,11 +186,16 @@ export function AiPreferencesSection() {
             label="Response style"
             description="How detailed and verbose AI responses should be."
           >
-            <select className="h-7 w-28 text-[12px] rounded-md border border-input bg-background px-2">
-              <option value="concise">Concise</option>
-              <option value="balanced">Balanced</option>
-              <option value="detailed">Detailed</option>
-            </select>
+            <Select value={detailLevel} onValueChange={onDetailLevelChange}>
+              <SelectTrigger className="h-7 w-28 text-[12px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="concise">Concise</SelectItem>
+                <SelectItem value="balanced">Balanced</SelectItem>
+                <SelectItem value="detailed">Detailed</SelectItem>
+              </SelectContent>
+            </Select>
           </SettingRow>
           <SettingRow
             label="Stream responses"
