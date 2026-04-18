@@ -120,14 +120,17 @@ export function MoreOptionsPopover({
                 {/* None option */}
                 <DropdownMenuItem
                   onClick={() => handleProjectSelect(null)}
-                  className="gap-2"
+                  className={cn(
+                    "gap-2",
+                    currentProjectId === null && "text-primary font-medium"
+                  )}
                 >
                   {currentProjectId === null ? (
                     <Check className="h-[14px] w-[14px] text-primary" />
                   ) : (
                     <span className="w-[14px]" />
                   )}
-                  <span>No project</span>
+                  <span>{currentProjectId === null ? "No project ✓" : "No project"}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
