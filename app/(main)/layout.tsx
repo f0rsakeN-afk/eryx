@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/main/sidebar/app-sidebar";
 import { InitUser } from "@/components/init-user";
+import { ProjectDialogsProvider } from "@/components/main/sidebar/dialogs/projects/project-dialogs-provider";
 import "../../styles/hide-scrollbar.css";
 
 export default async function MainLayout({
@@ -23,14 +24,16 @@ export default async function MainLayout({
     >
       <AppSidebar />
       <SidebarInset className="min-h-0 overflow-hidden">
-        {/* Mobile top bar */}
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 md:hidden">
-          <SidebarTrigger className="-ml-1" />
-          {/* <span className="text-sm font-medium text-foreground">Eryx</span> */}
-        </header>
+        <ProjectDialogsProvider>
+          {/* Mobile top bar */}
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 md:hidden">
+            <SidebarTrigger className="-ml-1" />
+            {/* <span className="text-sm font-medium text-foreground">Eryx</span> */}
+          </header>
 
-        <InitUser />
-        {children}
+          <InitUser />
+          {children}
+        </ProjectDialogsProvider>
       </SidebarInset>
     </SidebarProvider>
   );

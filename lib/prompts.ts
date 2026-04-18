@@ -3,6 +3,8 @@
  * Optimized for performance - string concatenation order matters for V8
  */
 
+export type ResponseStyle = "normal" | "learning" | "concise" | "explanatory" | "formal";
+
 export interface PromptConfig {
   tone?: "formal" | "casual" | "friendly" | "technical" | "concise" | "detailed" | "balanced";
   detailLevel?: "CONCISE" | "BALANCED" | "DETAILED";
@@ -17,11 +19,112 @@ export interface PromptConfig {
   learningMode?: boolean;
   explanatoryMode?: boolean;
   researchMode?: boolean;
+  responseStyle?: ResponseStyle;
 }
 
-// Cache for built prompts - avoid rebuilding same config
-const promptCache = new Map<string, string>();
+/**
+ * Map response style to prompt config overrides
+ */
+function applyResponseStyle(config: PromptConfig): PromptConfig {
+  const style = config.responseStyle || "normal";
+
+  const styleMappings: Record<ResponseStyle, Partial<PromptConfig>> = {
+    normal: {
+      tone: config.tone || "balanced",
+      detailLevel: config.detailLevel || "BALANCED",
+      learningMode: false,
+      explanatoryMode: false,
+    },
+    learning: {
+      tone: "friendly",
+      detailLevel: "DETAILED",
+      learningMode: true,
+      explanatoryMode: false,
+    },
+    concise: {
+      tone: "concise",
+      detailLevel: "CONCISE",
+      learningMode: false,
+      explanatoryMode: false,
+    },
+    explanatory: {
+      tone: "friendly",
+      detailLevel: "DETAILED",
+      learningMode: false,
+      explanatoryMode: true,
+    },
+    formal: {
+      tone: "formal",
+      detailLevel: "DETAILED",
+      learningMode: false,
+      explanatoryMode: false,
+    },
+  };
+
+  return {
+    ...config,
+    ...styleMappings[style],
+  };
+}
+
+// ============================================================================
+// LRU CACHE - O(1) get/put using Map + ordering
+// ============================================================================
+
+/**
+ * LRU Cache implementation using Map's insertion ordering
+ * Map maintains insertion order, so oldest = first, newest = last
+ * get() moves item to end (most recently used)
+ * set() removes oldest if at capacity
+ */
+class LRUCache<K, V> {
+  private cache: Map<K, V>;
+  private readonly capacity: number;
+
+  constructor(capacity: number) {
+    this.cache = new Map();
+    this.capacity = capacity;
+  }
+
+  get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined;
+    // Move to end (most recently used) - Map maintains insertion order
+    const value = this.cache.get(key)!;
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    // If key exists, delete first (will re-add at end)
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.capacity) {
+      // At capacity - remove oldest (first item)
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey);
+      }
+    }
+    this.cache.set(key, value);
+  }
+
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+// Cache for built prompts - LRU with 50 entry capacity
 const MAX_CACHE_SIZE = 50;
+const promptCache = new LRUCache<string, string>(MAX_CACHE_SIZE);
 
 function getCacheKey(config: PromptConfig): string {
   return JSON.stringify(config);
@@ -740,7 +843,9 @@ function buildPremiumPrinciples(): string {
  * Uses caching to avoid rebuilding identical prompts
  */
 export function buildSystemPrompt(config: PromptConfig = {}): string {
-  const cacheKey = getCacheKey(config);
+  // Apply response style overrides
+  const finalConfig = applyResponseStyle(config);
+  const cacheKey = getCacheKey(finalConfig);
 
   // Check cache first
   const cached = promptCache.get(cacheKey);
@@ -779,12 +884,7 @@ export function buildSystemPrompt(config: PromptConfig = {}): string {
 
   const result = parts.filter(p => p !== "").join("\n\n");
 
-  // Cache management
-  if (promptCache.size >= MAX_CACHE_SIZE) {
-    // Clear half the cache when full
-    const keysToDelete = Array.from(promptCache.keys()).slice(0, Math.floor(MAX_CACHE_SIZE / 2));
-    keysToDelete.forEach(k => promptCache.delete(k));
-  }
+  // LRUCache handles eviction automatically when at capacity
   promptCache.set(cacheKey, result);
 
   return result;

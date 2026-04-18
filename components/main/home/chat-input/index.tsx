@@ -2,23 +2,20 @@
 
 import * as React from "react";
 import { useCallback } from "react";
-import { Paperclip, Search, Loader2, ArrowRight, Clock, X } from "lucide-react";
+import { Search, Loader2, ArrowRight, Clock, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SendButton } from "./send-button";
 import { FilePreviews } from "./file-previews";
 import { MemoryPopover } from "./memory-popover";
+import { MoreOptionsPopover } from "./more-options-popover";
 import { ChatActionsMenu, ActiveConnectorsPill } from "./actions-menu";
 import { useServers } from "@/hooks/use-mcp-servers";
 import { useUser } from "@stackframe/stack";
-import { useChatSuggestions, prefetchSuggestions } from "@/hooks/use-chat-suggestions";
+import { useChatSuggestions } from "@/hooks/use-chat-suggestions";
 import { useSound } from "@/hooks/use-sound";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Attachment, ChatInputProps } from "@/types/chat-input";
+import type { ResponseStyle } from "./more-options-popover";
 
 export function ChatInput({
   value,
@@ -31,7 +28,13 @@ export function ChatInput({
   onMemoriesSelect,
   webSearchEnabled = false,
   onWebSearchToggle,
-}: ChatInputProps) {
+  projectId,
+  onProjectIdChange,
+  style = "normal",
+  onStyleChange,
+}: ChatInputProps & {
+  style?: ResponseStyle;
+}) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [files, setFiles] = React.useState<Attachment[]>([]);
@@ -168,7 +171,7 @@ export function ChatInput({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => { setFocused(true); setShowSuggestions(true); prefetchSuggestions(); }}
+          onFocus={() => { setFocused(true); setShowSuggestions(true); }}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           rows={1}
           placeholder={placeholder}
@@ -226,7 +229,7 @@ export function ChatInput({
                 )}
 
                 {/* Suggestions */}
-                {showDropdown && !isLoading && suggestions.length > 0 && (
+                {showDropdown && !isSuggestionsLoading && suggestions.length > 0 && (
                   <>
                     {showRecent && (
                       <div className="px-4 py-1.5 border-b border-border/40">
@@ -254,7 +257,7 @@ export function ChatInput({
                   </>
                 )}
 
-                {isSuggestionsLoading && (
+                {isSuggestionsLoading && value.trim().length > 0 && (
                   <div className="flex items-center justify-center py-3 px-4">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
@@ -268,23 +271,14 @@ export function ChatInput({
         <div className="flex items-center justify-between px-4 pb-3.5 -mt-0.5">
           {/* Left: action buttons */}
           <div className="flex items-center gap-1.5">
-            {/* Attach files */}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    onClick={handleFileClick}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/70 transition-all duration-150 active:scale-95"
-                  >
-                    <Paperclip className="h-[14px] w-[14px]" />
-                  </button>
-                }
-              />
-              <TooltipContent side="bottom" sideOffset={8}>
-                Attach files
-              </TooltipContent>
-            </Tooltip>
+            {/* More options: Add file, Add to project, Style */}
+            <MoreOptionsPopover
+              onFileSelect={handleFileClick}
+              onProjectSelect={onProjectIdChange}
+              onStyleSelect={onStyleChange}
+              currentProjectId={projectId}
+              currentStyle={style}
+            />
 
             {/* Memory popover */}
             <MemoryPopover
