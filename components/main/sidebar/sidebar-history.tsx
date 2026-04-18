@@ -23,12 +23,10 @@ import {
 } from "@/hooks/use-projects";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TabId } from "./data";
+import { useProjectDialogs } from "./dialogs/projects/create-project-context";
 
 interface SidebarHistoryProps {
   activeTab: TabId;
-  onCreateProject?: () => void;
-  onRenameProject?: (project: { id: string; name: string }) => void;
-  onDeleteProject?: (project: { id: string; name: string }) => void;
 }
 
 interface ChatItem {
@@ -124,10 +122,8 @@ function SidebarEmptyState({
 
 export function SidebarHistory({
   activeTab,
-  onCreateProject,
-  onRenameProject,
-  onDeleteProject,
 }: SidebarHistoryProps) {
+  const { openCreateProjectDialog, openRenameProject, openDeleteProject } = useProjectDialogs();
   // Subscribe to SSE events for real-time updates
   useChatEvents();
 
@@ -308,8 +304,8 @@ export function SidebarHistory({
                       title: project.name,
                       pinnedAt: project.pinnedAt,
                     }}
-                    onRename={onRenameProject || (() => {})}
-                    onDelete={onDeleteProject || (() => {})}
+                    onRename={openRenameProject}
+                    onDelete={openDeleteProject}
                     onArchive={handleUnarchiveProject}
                     onPin={handlePinProject}
                     onUnpin={handleUnpinProject}
@@ -393,7 +389,7 @@ export function SidebarHistory({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={onCreateProject}
+                  onClick={openCreateProjectDialog}
                   className="w-full justify-center gap-2 h-9 bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 rounded-xl transition-all shadow-sm active:scale-[0.98]"
                 >
                   <Plus className="h-4 w-4" />
@@ -421,8 +417,8 @@ export function SidebarHistory({
                     title: project.name,
                     pinnedAt: project.pinnedAt,
                   }}
-                  onRename={onRenameProject || (() => {})}
-                  onDelete={onDeleteProject || (() => {})}
+                  onRename={openRenameProject}
+                  onDelete={openDeleteProject}
                   onArchive={handleArchiveProject}
                   onPin={handlePinProject}
                   onUnpin={handleUnpinProject}
@@ -435,7 +431,7 @@ export function SidebarHistory({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={onCreateProject}
+                onClick={openCreateProjectDialog}
                 className="w-full justify-center gap-2 h-9 bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 rounded-xl transition-all shadow-sm active:scale-[0.98]"
               >
                 <Plus className="h-4 w-4" />

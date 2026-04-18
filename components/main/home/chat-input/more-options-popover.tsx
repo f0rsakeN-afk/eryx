@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useProjects } from "@/hooks/use-projects";
-import { useCreateProjectDialog } from "@/components/main/sidebar/dialogs/projects/create-project-context";
+import { useProjectDialogs } from "@/components/main/sidebar/dialogs/projects/create-project-context";
 
 export type ResponseStyle = "normal" | "learning" | "concise" | "explanatory" | "formal";
 
@@ -49,7 +49,7 @@ export function MoreOptionsPopover({
   currentStyle = "normal",
 }: MoreOptionsPopoverProps) {
   const { data: projectsData, isLoading: projectsLoading } = useProjects();
-  const { openCreateProjectDialog } = useCreateProjectDialog();
+  const { openCreateProjectDialog } = useProjectDialogs();
 
   const projects = projectsData?.projects || [];
   const currentProject = projects.find(p => p.id === currentProjectId);
