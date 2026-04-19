@@ -11,6 +11,7 @@ import { ChatHeader } from "@/components/main/chat/chat-header";
 import type { Message } from "@/services/chat.service";
 import { SplitViewContext } from "@/components/main/chat/split-view-context";
 import { useOptimizedScroll } from "@/hooks/use-optimized-scroll";
+import { useScrollTracking } from "@/hooks/use-scroll-tracking";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { MemoryDialog } from "@/components/main/memory/memory-dialog";
 import { ChatErrorBoundary } from "@/components/ui/error-boundary";
@@ -222,11 +223,14 @@ function VirtualizedMessageList({
 }: VirtualizedMessageListProps) {
   const parentRef = React.useRef<HTMLDivElement>(null);
   const lastScrollTop = React.useRef(0);
-  const lastCount = React.useRef(messages.length);
   const isStreamingRef = React.useRef(false);
 
-  const { scrollToBottom, markManualScroll, isNearBottom } =
+  const { scrollToBottom, markManualScroll, resetManualScroll } =
     useOptimizedScroll(parentRef);
+
+  const { touchActiveRef } = useScrollTracking(parentRef, {
+    onWheelUp: () => markManualScroll({ userScrolledUp: true }),
+  });
 
   // Use simple virtual scrolling with CSS
   const virtualizer = useVirtualizer({
@@ -251,11 +255,12 @@ function VirtualizedMessageList({
       if (scrollDelta < -50 && scrollTop < 200 && hasOlder && !isLoadingOlder) {
         onLoadOlder();
       }
+      if (!touchActiveRef.current) markManualScroll();
     };
 
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
-  }, [hasOlder, isLoadingOlder, onLoadOlder]);
+  }, [hasOlder, isLoadingOlder, onLoadOlder, markManualScroll, touchActiveRef]);
 
   // Auto-scroll to bottom as streaming response arrives
   React.useEffect(() => {
@@ -266,30 +271,14 @@ function VirtualizedMessageList({
     isStreamingRef.current = hasStreaming;
 
     if (hasStreaming && !wasStreaming) {
-      // Just started streaming - scroll to bottom
-      markManualScroll();
+      resetManualScroll();
       scrollToBottom();
     } else if (hasStreaming) {
-      // Still streaming - continue scrolling
       scrollToBottom();
     } else if (!hasStreaming && wasStreaming) {
-      // Just finished streaming - reset manual scroll tracking
       markManualScroll();
     }
-  }, [messages.length, scrollToBottom, markManualScroll]);
-
-  // Track manual scroll
-  React.useEffect(() => {
-    const el = parentRef.current;
-    if (!el) return;
-
-    const handleScroll = () => {
-      markManualScroll();
-    };
-
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
-  }, [markManualScroll]);
+  }, [messages.length, scrollToBottom, markManualScroll, resetManualScroll]);
 
   return (
     <div ref={parentRef} className="flex-1 overflow-y-auto hide-scrollbar">
