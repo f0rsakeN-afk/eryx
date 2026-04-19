@@ -6,10 +6,14 @@ import { SharedChatViewer } from '@/components/main/share/shared-chat-viewer';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
   // Check for demo mode
   if (id === 'demo') {
-    return { title: 'Shared Chat Demo' };
+    return {
+      title: 'Shared Chat Demo | Eryx',
+      description: 'A shared chat on Eryx',
+    };
   }
 
   const chat = await prisma.chat.findFirst({
@@ -18,12 +22,39 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   });
 
   if (!chat) {
-    return { title: 'Shared Chat' };
+    return {
+      title: 'Shared Chat | Eryx',
+      description: 'A shared chat on Eryx',
+    };
   }
 
   return {
-    title: chat.title,
+    title: `${chat.title} | Eryx`,
     description: 'A shared chat on Eryx',
+    openGraph: {
+      title: chat.title,
+      description: 'A shared chat on Eryx',
+      url: `/share/${id}`,
+      siteName: 'Eryx',
+      type: 'article',
+      images: [
+        {
+          url: `/api/og/chat/${id}`,
+          width: 1200,
+          height: 630,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: chat.title,
+      description: 'A shared chat on Eryx',
+      creator: '@eryxai',
+      images: [`/api/og/chat/${id}`],
+    },
+    alternates: {
+      canonical: `/share/${id}`,
+    },
   };
 }
 

@@ -5,12 +5,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const siteURL = getSiteURL();
 
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: siteURL, lastModified: new Date(), changeFrequency: "daily" },
+    { url: siteURL, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
+    { url: `${siteURL}/home`, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
+    {
+      url: `${siteURL}/apps`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
     {
       url: `${siteURL}/pricing`,
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.9,
+    },
+    {
+      url: `${siteURL}/about`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${siteURL}/changelog`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.7,
     },
     {
       url: `${siteURL}/contact`,

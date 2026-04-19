@@ -6,10 +6,23 @@ import { FAQ } from "@/components/marketing/landing/faq";
 import { Pricing } from "@/components/marketing/landing/pricing";
 
 export const metadata: Metadata = {
-  title: "Eryx | AI-powered system design and search assistant",
+  title: "About | Eryx",
   description:
     "Eryx combines intelligent technical chat, real-time web search with RAG, and interactive system design visualization into one developer-centric platform.",
-  alternates: { canonical: "/" },
+  openGraph: {
+    title: "About | Eryx",
+    description: "Eryx combines intelligent technical chat, real-time web search with RAG, and interactive system design visualization.",
+    url: "/about",
+    siteName: "Eryx",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About | Eryx",
+    description: "Eryx combines intelligent technical chat, real-time web search with RAG, and interactive system design visualization.",
+    creator: "@eryxai",
+  },
+  alternates: { canonical: "/about" },
 };
 
 export default function MarketingPage() {
