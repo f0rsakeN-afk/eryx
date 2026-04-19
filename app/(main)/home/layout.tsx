@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
-const title = "Pricing";
+const title = "Eryx — AI Assistant";
 const description =
-  "Choose the plan that fits your needs. Start free or upgrade to Pro for unlimited access.";
+  "Ask anything. Eryx is a powerful AI chat assistant that helps you code, research, and explore ideas seamlessly.";
 
 export const metadata: Metadata = {
   title,
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   openGraph: {
     title,
     description,
-    url: "/pricing",
+    url: "/home",
     siteName: "Eryx",
     type: "website",
   },
@@ -21,14 +21,14 @@ export const metadata: Metadata = {
     creator: "@eryxai",
   },
   alternates: {
-    canonical: "/pricing",
+    canonical: "/home",
   },
 };
 
-export default function PricingLayout({
+export default function HomeLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return children;
 }

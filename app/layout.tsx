@@ -39,9 +39,55 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
   ),
-  title: "Eryx — AI Assistant",
+  title: {
+    default: "Eryx — AI Assistant",
+    template: "%s | Eryx",
+  },
   description:
-    "Eryx is a powerful, intelligent AI chat assistant. Ask questions, get help with coding, and explore ideas seamlessly.",
+    "Eryx is a powerful, intelligent AI chat assistant. Ask questions, get help with coding, and explore ideas seamlessly. Connect to GitHub, Notion, Slack, and 50+ apps.",
+  keywords: [
+    "AI assistant",
+    "AI chat",
+    "chatbot",
+    "Claude alternative",
+    "GPT alternative",
+    "MCP",
+    "Model Context Protocol",
+    "AI tools",
+    "productivity AI",
+    "coding assistant",
+    "GitHub integration",
+    "Notion integration",
+  ],
+  authors: [{ name: "Eryx" }],
+  creator: "@eryxai",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    siteName: "Eryx",
+    title: "Eryx — AI Assistant",
+    description:
+      "Eryx is a powerful, intelligent AI chat assistant. Ask questions, get help with coding, and explore ideas seamlessly.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Eryx — AI Assistant",
+    description:
+      "Eryx is a powerful, intelligent AI chat assistant. Ask questions, get help with coding, and explore ideas seamlessly.",
+    creator: "@eryxai",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  alternates: {
+    canonical: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+  },
 };
 
 export default function RootLayout({
