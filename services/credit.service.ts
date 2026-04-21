@@ -2,6 +2,8 @@
  * Credit Service
  * Handles credit balance and deductions
  * Uses DB-backed plans via plan.service.ts
+ *
+ * In development mode, credit checks and deductions are bypassed.
  */
 
 import prisma from "@/lib/prisma";
@@ -10,6 +12,8 @@ import { invalidateUserLimitsCache } from "@/services/limit.service";
 import { invalidateAccountCache } from "@/services/account.service";
 import redis, { KEYS } from "@/lib/redis";
 import { publishCreditsUpdated } from "@/services/credit-pubsub.service";
+
+const BYPASS_CREDITS = process.env.NODE_ENV === "development";
 
 // Credit costs remain in polar-config (not plan-specific)
 export type CreditOperation = keyof typeof polarConfig.creditCosts;
@@ -49,6 +53,15 @@ export async function deductCredits(
   operation: CreditOperation,
   customAmount?: number
 ): Promise<DeductionResult> {
+  if (BYPASS_CREDITS) {
+    return {
+      success: true,
+      deducted: 0,
+      remainingCredits: 999999,
+      operation,
+    };
+  }
+
   const cost = customAmount ?? polarConfig.creditCosts[operation] ?? 1;
 
   try {
@@ -178,6 +191,9 @@ export async function checkCreditsForOperation(
   userId: string,
   operation: CreditOperation
 ): Promise<boolean> {
+  if (BYPASS_CREDITS) {
+    return true;
+  }
   const cost = polarConfig.creditCosts[operation] ?? 1;
   const balance = await getUserCredits(userId);
   return balance >= cost;

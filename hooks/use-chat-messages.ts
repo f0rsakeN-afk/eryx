@@ -280,6 +280,11 @@ export function useChatMessages({
             mode
           );
         } catch (err) {
+          // Ignore AbortError - this happens when user sends new message while streaming
+          if (err instanceof Error && err.name === 'AbortError') {
+            console.debug("[sendUserMessage] aborted previous stream");
+            return;
+          }
           console.error("[sendUserMessage] error:", err);
           isStreamingRef.current = false;
           abortControllerRef.current = null;
@@ -462,6 +467,11 @@ export function useChatMessages({
             mode
           );
         } catch (err) {
+          // Ignore AbortError - this happens when user sends new message while streaming
+          if (err instanceof Error && err.name === 'AbortError') {
+            console.debug("[sendUserMessage] aborted previous stream");
+            return;
+          }
           console.error("[sendUserMessage] error:", err);
           isStreamingRef.current = false;
           abortControllerRef.current = null;

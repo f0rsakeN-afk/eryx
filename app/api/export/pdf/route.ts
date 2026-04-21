@@ -224,7 +224,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid content' }, { status: 400 });
     }
 
-    const title = body.title ?? 'Scira AI';
+    const title = body.title ?? 'Eryx AI';
     const rawContent = body.content;
     const meta = body.meta ?? {};
 

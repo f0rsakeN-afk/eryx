@@ -90,7 +90,7 @@ interface StatusData {
     redis: DetailedMetrics;
     api: DetailedMetrics;
     search: DetailedMetrics;
-    groq: DetailedMetrics;
+    openai: DetailedMetrics;
   };
 }
 
@@ -99,7 +99,7 @@ interface RawData {
   redis: HealthCheck[];
   api: HealthCheck[];
   search: HealthCheck[];
-  groq: HealthCheck[];
+  openai: HealthCheck[];
   searxng: HealthCheck[];
 }
 
@@ -604,7 +604,7 @@ export function StatusContent() {
 
   const dbData = rawData?.database || [];
   const redisData = rawData?.redis || [];
-  const groqData = rawData?.groq || [];
+  const openaiData = rawData?.openai || [];
 
   const coreComponents = (components || []).filter((c: Component) => c.category === "core");
   const aiComponents = (components || []).filter((c: Component) => c.category === "ai");
