@@ -217,6 +217,9 @@ function cleanupStream(chatId: string) {
     streamTimestamps.delete(chatId);
   }
 
+  // Clean up instance reference to prevent memory leaks
+  resumableStreamInstances.delete(streamId);
+
   // Feature 4: Cross-Container Active Detection - untrack from Redis
   untrackActiveStream(streamId).catch((err) => {
     console.error("[ResumableStream] Failed to untrack active stream:", err);

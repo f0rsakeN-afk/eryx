@@ -273,10 +273,12 @@ export const MoreOptionsPopover = React.memo(function MoreOptionsPopover({
         </button>
 
         {/* Add to project - Submenu */}
-        <div className="relative">
+        <div
+          onMouseEnter={() => setProjectSubmenuOpen(true)}
+          onMouseLeave={() => setProjectSubmenuOpen(false)}
+          className="relative"
+        >
           <button
-            onMouseEnter={() => setProjectSubmenuOpen(true)}
-            onMouseLeave={() => setProjectSubmenuOpen(false)}
             className="flex items-center gap-2.5 w-full px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-all rounded-md cursor-pointer"
           >
             {/* <FolderOpenDot className="h-[14px] w-[14px] shrink-0" /> */}
@@ -284,7 +286,7 @@ export const MoreOptionsPopover = React.memo(function MoreOptionsPopover({
           </button>
 
           {projectSubmenuOpen && (
-            <div className="absolute left-full top-0 ml-1 w-48 bg-popover border border-border rounded-lg shadow-lg p-1.5">
+            <div className="absolute left-full top-0 ml-1 w-48 bg-popover border border-border rounded-lg shadow-lg p-1.5 z-50">
               <ProjectSubmenu
                 projects={projects}
                 currentProjectId={currentProjectId}

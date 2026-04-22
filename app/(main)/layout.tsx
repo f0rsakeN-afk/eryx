@@ -24,9 +24,9 @@ export default async function MainLayout({
       defaultOpen={defaultOpen}
       className="h-svh overflow-hidden"
     >
-      <AppSidebar />
-      <SidebarInset className="min-h-0 overflow-hidden">
-        <ProjectDialogsProvider>
+      <ProjectDialogsProvider>
+        <AppSidebar />
+        <SidebarInset className="min-h-0 overflow-hidden">
           {/* Mobile top bar */}
           <MobileHeader />
 
@@ -34,8 +34,8 @@ export default async function MainLayout({
           <AuthStatusProvider>
             <AuthGuard>{children}</AuthGuard>
           </AuthStatusProvider>
-        </ProjectDialogsProvider>
-      </SidebarInset>
+        </SidebarInset>
+      </ProjectDialogsProvider>
     </SidebarProvider>
   );
 }

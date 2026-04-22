@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChatInput } from "@/components/main/home/chat-input";
 import { Chip } from "@/components/main/home/chip";
 import { PromptModal } from "@/components/main/home/prompt-modal";
-import { CHIPS, type ChipData } from "@/components/main/home/data";
+import { getChipsByProfession, type ChipData } from "@/components/main/home/data";
 import { getTimeBasedHeading } from "@/components/main/home/data/headings";
 // import { CreditsButton } from "@/components/main/header/credits-button";
 // import { NotificationsButton } from "@/components/main/header/notifications-button";
@@ -15,6 +15,7 @@ import { AuthDialog } from "@/components/main/sidebar/dialogs/auth/auth-dialog";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { useCreateChat } from "@/hooks/use-create-chat";
 import { usePendingPrompt } from "@/hooks/use-pending-prompt";
+import { useProfession } from "@/hooks/use-profession";
 
 export default function HomePage() {
   const router = useRouter();
@@ -23,12 +24,13 @@ export default function HomePage() {
   const [heading] = useState(() => getTimeBasedHeading());
   const [activeChip, setActiveChip] = useState<ChipData | null>(null);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [currentModel, setCurrentModel] = useState("gpt-4.1-mini");
 
   const { data: authStatus, isLoading: authLoading } = useAuthStatus();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const { pendingPrompt, setPendingPrompt, clearPendingPrompt } = usePendingPrompt();
+  const { profession } = useProfession();
 
-  // Restore pending prompt into input on mount
   useEffect(() => {
     if (pendingPrompt) {
       setInput(pendingPrompt);
@@ -98,7 +100,7 @@ export default function HomePage() {
           </h1>
 
            <div className="mb-6 xl:hidden flex flex-wrap items-center justify-center gap-2">
-            {CHIPS.map((chip) => (
+            {getChipsByProfession(profession).map((chip) => (
               <Chip key={chip.label} chip={chip} onOpen={setActiveChip} />
             ))}
           </div> 
@@ -113,11 +115,13 @@ export default function HomePage() {
             onOpenMemory={() => setMemoryDialogOpen(true)}
             webSearchEnabled={webSearchEnabled}
             onWebSearchToggle={(enabled) => setWebSearchEnabled(enabled)}
+            currentModel={currentModel}
+            onModelChange={setCurrentModel}
           />
         </div>
 
          <div className="mt-6 hidden xl:flex flex-wrap items-center justify-center gap-2">
-            {CHIPS.map((chip) => (
+            {getChipsByProfession(profession).map((chip) => (
               <Chip key={chip.label} chip={chip} onOpen={setActiveChip} />
             ))}
           </div> 

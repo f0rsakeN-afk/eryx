@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrCreateUser } from '@/lib/auth';
+import { getOrCreateUser, AccountDeactivatedError } from '@/lib/auth';
 import { Lexer, type Token } from 'marked';
+import { logger } from '@/lib/logger';
 import {
   Document,
   Packer,
@@ -788,7 +789,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e: unknown) {
-    console.error('DOCX export error:', e);
+    if (e instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
+    logger.error("[DOCXExport] DOCX export failed", e as Error);
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to generate DOCX' }, { status: 500 });
   }
 }

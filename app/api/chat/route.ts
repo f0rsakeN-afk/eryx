@@ -1,9 +1,9 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { JsonToSseTransformStream } from "ai";
 import prisma from "@/lib/prisma";
 import redis, { KEYS } from "@/lib/redis";
 import { buildSystemPrompt, type PromptConfig, type ResponseStyle } from "@/lib/prompts";
-import { validateAuth } from "@/lib/auth";
+import { validateAuth, AccountDeactivatedError } from "@/lib/auth";
 import { aiConfig } from "@/lib/config";
 import { getUserPreferences } from "@/services/preferences.service";
 import { getChatContext, queueSummarization } from "@/services/summarize.service";
@@ -430,27 +430,18 @@ export async function POST(req: NextRequest) {
 
     const user = await validateAuth(req);
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json().catch(() => ({}));
     const { messages, chatId, mode, resume, style, model: requestedModel } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ error: "Messages required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Messages required" }, { status: 400 });
     }
 
     if (!chatId) {
-      return new Response(JSON.stringify({ error: "Chat ID required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Chat ID required" }, { status: 400 });
     }
 
     // Verify user owns this chat
@@ -460,10 +451,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!chat) {
-      return new Response(JSON.stringify({ error: "Chat not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
     const supersededKey = getSupersededKey(chatId, streamVersion);
@@ -551,10 +539,7 @@ export async function POST(req: NextRequest) {
     let fullMessages = await buildMessages(chatId, messages, undefined, style);
 
     if (fullMessages.length === 0 || (fullMessages.length === 1 && fullMessages[0].role === "system")) {
-      return new Response(JSON.stringify({ error: "No messages available" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "No messages available" }, { status: 400 });
     }
 
     // Track state
@@ -731,11 +716,11 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     console.error("[chat] Chat API error:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -746,20 +731,14 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await validateAuth(req);
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json().catch(() => ({}));
     const { chatId } = body;
 
     if (!chatId) {
-      return new Response(JSON.stringify({ error: "Chat ID required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Chat ID required" }, { status: 400 });
     }
 
     // Verify user owns this chat
@@ -769,24 +748,16 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (!chat) {
-      return new Response(JSON.stringify({ error: "Chat not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
+      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
     }
 
     // Stop the resumable stream
     await stopResumableStream(chatId);
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[chat] Stop stream error:", error);
-    return new Response(JSON.stringify({ error: "Failed to stop stream" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ error: "Failed to stop stream" }, { status: 500 });
   }
 }
 

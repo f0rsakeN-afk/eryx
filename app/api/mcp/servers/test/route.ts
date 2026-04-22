@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getOrCreateUser } from '@/lib/auth';
+import { getOrCreateUser, AccountDeactivatedError } from '@/lib/auth';
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { validateMcpServerUrl } from '@/lib/mcp/server-config';
 import { getMcpAuthHeaders } from '@/lib/mcp/auth-headers';
+import { logger } from '@/lib/logger';
 
 function isProUser(planTier: string | null | undefined) {
   return planTier === 'PRO' || planTier === 'ENTERPRISE' || planTier === 'BASIC';
@@ -122,11 +123,14 @@ export async function POST(request: Request) {
       await client.close();
     }
   } catch (error) {
+    if (error instanceof AccountDeactivatedError) {
+      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    }
     const rawMessage = error instanceof Error ? error.message : 'Connection test failed';
 
     // Update server error if testing stored server
     if (error instanceof Error) {
-      console.error('Failed to test MCP server:', rawMessage);
+      logger.error("[MCPServers] Failed to test MCP server", error);
     }
 
     if (error instanceof Error && error.message === 'Unauthorized') {
