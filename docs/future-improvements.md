@@ -2,6 +2,33 @@
 
 This document outlines planned improvements and features to be implemented.
 
+## Completed Features
+
+### Cookie Consent Manager ✅
+- Banner on first visit with Accept/Reject/Preferences options
+- 3 categories: Analytics, Personalization, Marketing
+- Persisted via cookies + localStorage
+- Settings page has dedicated Cookies section
+- API endpoint for audit logging (logs to server)
+
+**Hooks:**
+- `useCookieConsent()` - Main context provider hook
+- `useCookieCategory(category)` - Check if category is allowed
+- `useAnalytics()` - Only tracks if analytics consent given
+- `usePersonalization()` - Only uses storage if personalization consent given
+
+**Components:**
+- `<CookieConsentBanner />` - Banner UI
+- `<ConsentGate category="...">` - Conditional render based on consent
+- `<CookieScript category="..." src="..." />` - Conditional script loading
+
+**GDPR Consideration:** The current API just logs consent. For full compliance, consider:
+- Adding a `CookieConsentLog` model to track consent history
+- Storing consent timestamp and version
+- Providing data export/deletion for cookie data
+
+---
+
 ## Data Export (Priority: High)
 
 ### Async Export with S3

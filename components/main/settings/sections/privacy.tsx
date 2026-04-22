@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Download, Trash2 } from "lucide-react";
+import { AlertTriangle, Download, Trash2, Cookie } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/sileo-toast";
+import { useCookieConsent } from "@/hooks/use-cookie-consent";
 
 function SettingRow({
   label,
@@ -76,6 +77,7 @@ export function PrivacySection({ settings: propSettings }: PrivacySectionProps) 
   const [deactivateOpen, setDeactivateOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
+  const cookieConsent = useCookieConsent();
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -260,6 +262,50 @@ export function PrivacySection({ settings: propSettings }: PrivacySectionProps) 
             <Switch
               checked={displaySettings.crashReports}
               onCheckedChange={(val) => onUpdate("crashReports", val)}
+              size="sm"
+            />
+          </SettingRow>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1">
+          Cookies
+        </p>
+        <div className="rounded-lg border border-border/60 bg-muted/20 px-3 divide-y divide-border/40">
+          <SettingRow
+            label="Analytics cookies"
+            description="Help us improve by tracking how you use the app."
+          >
+            <Switch
+              checked={cookieConsent.consent.analytics}
+              onCheckedChange={(val) =>
+                cookieConsent.updateConsent({ ...cookieConsent.consent, analytics: val })
+              }
+              size="sm"
+            />
+          </SettingRow>
+          <SettingRow
+            label="Personalization cookies"
+            description="Remember your preferences for better experience."
+          >
+            <Switch
+              checked={cookieConsent.consent.personalization}
+              onCheckedChange={(val) =>
+                cookieConsent.updateConsent({ ...cookieConsent.consent, personalization: val })
+              }
+              size="sm"
+            />
+          </SettingRow>
+          <SettingRow
+            label="Marketing cookies"
+            description="Help us deliver relevant ads and track campaigns."
+          >
+            <Switch
+              checked={cookieConsent.consent.marketing}
+              onCheckedChange={(val) =>
+                cookieConsent.updateConsent({ ...cookieConsent.consent, marketing: val })
+              }
               size="sm"
             />
           </SettingRow>

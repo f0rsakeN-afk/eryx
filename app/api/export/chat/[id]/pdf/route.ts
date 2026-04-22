@@ -173,8 +173,6 @@ export async function GET(
       yPosition -= lineHeight;
     }
 
-    const messages = chat.messages || [];
-
     if (messages.length > MAX_EXPORT_MESSAGES) {
       return NextResponse.json(
         { error: `Chat too large to export (${messages.length} messages, max ${MAX_EXPORT_MESSAGES})` },

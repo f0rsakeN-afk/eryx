@@ -199,7 +199,7 @@ This export contains all your Eryx account data.`);
       compressionOptions: { level: 9 },
     });
 
-    return new Response(zipBuffer, {
+    return new Response(new Uint8Array(zipBuffer), {
       status: 200,
       headers: {
         "Content-Type": "application/zip",

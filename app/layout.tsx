@@ -8,6 +8,8 @@ import { ThemeProvider } from "@/components/shared/theme-provider";
 import MainLayout from "./mainLayout";
 import { Toaster } from "@/components/ui/sileo-toast";
 import { StackProviderWrapper } from "@/components/providers/stack-provider-wrapper";
+import { CookieConsentProvider } from "@/hooks/use-cookie-consent";
+import { CookieConsentBanner } from "@/components/main/cookie-consent-banner";
 //import { PageTransitionProvider } from "@/components/shared/page-transition-provider";
 
 // const inter = Inter({
@@ -101,12 +103,15 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} ${sourceSerif.variable} [--font-code:var(--font-sans)] h-full antialiased scroll-smooth`}
     >
       <body className="min-h-dvh flex flex-col bg-background text-foreground">
-        <StackProviderWrapper>
+        <CookieConsentProvider>
+          <StackProviderWrapper>
             <ThemeProvider defaultTheme="dark" attribute="class">
               <Toaster position="top-center" />
               <MainLayout>{children}</MainLayout>
+              <CookieConsentBanner />
             </ThemeProvider>
           </StackProviderWrapper>
+        </CookieConsentProvider>
       </body>
     </html>
   );
