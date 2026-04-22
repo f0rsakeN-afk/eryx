@@ -33,10 +33,7 @@ const createMcpServerSchema = z.object({
 });
 
 function isProUser(planTier: string | null | undefined) {
-  // Allow all logged-in users for now (development mode)
-  // TODO: Re-enable subscription check when ready
-  return true;
-  // return planTier === 'PRO' || planTier === 'ENTERPRISE' || planTier === 'BASIC';
+  return planTier === 'PRO' || planTier === 'ENTERPRISE' || planTier === 'BASIC';
 }
 
 function serializeMcpServer(server: {

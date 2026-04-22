@@ -18,11 +18,12 @@ export default function proxy(request: NextRequest) {
     return response;
   }
 
-  // Allow static assets, API routes, and legal pages
+  // Allow static assets, API routes, handler, and legal pages
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/favicon") ||
+    pathname.startsWith("/handler") ||
     pathname.startsWith("/legal") ||
     pathname.includes(".")
   ) {

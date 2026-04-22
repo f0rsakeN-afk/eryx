@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getOrCreateUser } from '@/lib/auth';
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib';
 import { Lexer, type Token } from 'marked';
 
@@ -219,6 +220,11 @@ function processMarkdownText(text: string): { text: string; links: { text: strin
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getOrCreateUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = parseExportBody(await req.json());
     if (!body) {
       return NextResponse.json({ error: 'Invalid content' }, { status: 400 });

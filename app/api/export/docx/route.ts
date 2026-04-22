@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getOrCreateUser } from '@/lib/auth';
 import { Lexer, type Token } from 'marked';
 import {
   Document,
@@ -357,6 +358,11 @@ function flattenInlineTokens(
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getOrCreateUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = parseExportBody(await req.json());
     if (!body) {
       return NextResponse.json({ error: 'Invalid content' }, { status: 400 });

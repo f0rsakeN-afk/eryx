@@ -5,8 +5,8 @@ import prisma from '@/lib/prisma';
 import { validateMcpServerUrl } from '@/lib/mcp/server-config';
 import { getMcpAuthHeaders } from '@/lib/mcp/auth-headers';
 
-function isProUser(_planTier: string | null | undefined) {
-  return true;
+function isProUser(planTier: string | null | undefined) {
+  return planTier === 'PRO' || planTier === 'ENTERPRISE' || planTier === 'BASIC';
 }
 
 const testMcpServerSchema = z.object({

@@ -12,8 +12,8 @@ import {
   McpTransportType,
 } from '@/lib/mcp/server-config';
 
-function isProUser(_planTier: string | null | undefined) {
-  return true;
+function isProUser(planTier: string | null | undefined) {
+  return planTier === 'PRO' || planTier === 'ENTERPRISE' || planTier === 'BASIC';
 }
 
 const optionalUrlField = z.preprocess(
