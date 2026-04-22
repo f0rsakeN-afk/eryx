@@ -39,7 +39,7 @@ export function AppSidebarHeader() {
                 alt="eryx logo"
                 height={20}
                 width={20}
-                preload
+                priority
                 className="dark:invert transition-opacity duration-150 group-hover/logo:opacity-0"
               />
               <PanelLeft className="absolute h-3.5 w-3.5 opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100" />
@@ -62,7 +62,7 @@ export function AppSidebarHeader() {
               alt="eryx logo"
               height={20}
               width={20}
-              preload
+              priority
               className="dark:invert"
             />
           </Link>

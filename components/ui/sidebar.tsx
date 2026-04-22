@@ -73,6 +73,10 @@ function SidebarProvider({
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
+
+  // Debounce cookie writes to prevent layout thrashing
+  const cookieTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value;
@@ -82,8 +86,13 @@ function SidebarProvider({
         _setOpen(openState);
       }
 
-      // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+      // Debounce cookie writes to prevent layout thrashing
+      if (cookieTimeoutRef.current) {
+        clearTimeout(cookieTimeoutRef.current);
+      }
+      cookieTimeoutRef.current = setTimeout(() => {
+        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+      }, 100);
     },
     [setOpenProp, open],
   );

@@ -19,7 +19,7 @@ import type { Attachment, ChatInputProps } from "@/types/chat-input";
 //import { Textarea } from "@/components/ui/textarea";
 import type { ResponseStyle } from "./more-options-popover";
 
-export function ChatInput({
+export const ChatInput = React.memo(function ChatInput({
   value,
   onChange,
   onSubmit,
@@ -333,4 +333,4 @@ export function ChatInput({
       </div>
     </div>
   );
-}
+});

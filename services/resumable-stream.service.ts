@@ -97,6 +97,28 @@ const streamAbortControllers = new Map<string, AbortController>();
 // Track content length for partial refunds
 const streamContentLengths = new Map<string, number>();
 
+// Periodic cleanup of stale entries (every 5 minutes)
+const STALE_ENTRY_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const streamTimestamps = new Map<string, number>();
+
+function cleanupStaleEntries() {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [chatId, timestamp] of streamTimestamps.entries()) {
+    if (now - timestamp > STALE_ENTRY_TTL_MS) {
+      streamAbortControllers.delete(chatId);
+      streamTimestamps.delete(chatId);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    console.warn(`[ResumableStream] Cleaned up ${cleaned} stale stream entries`);
+  }
+}
+
+// Run cleanup every 5 minutes
+setInterval(cleanupStaleEntries, 5 * 60 * 1000);
+
 export function getStreamId(chatId: string): string {
   return `chat:${chatId}:stream`;
 }
@@ -191,6 +213,7 @@ function cleanupStream(chatId: string) {
   if (abortController) {
     abortController.abort();
     streamAbortControllers.delete(chatId);
+    streamTimestamps.delete(chatId);
   }
 
   // Feature 4: Cross-Container Active Detection - untrack from Redis
@@ -285,6 +308,7 @@ export async function startResumableStream(
 
   const abortController = new AbortController();
   streamAbortControllers.set(chatId, abortController);
+  streamTimestamps.set(chatId, Date.now());
 
   // Feature 4: Cross-Container Active Detection - track in Redis
   await trackActiveStream(streamId);
