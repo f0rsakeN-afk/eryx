@@ -259,7 +259,7 @@ export async function streamChat(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
   mode?: "chat" | "web",
-  options?: { resume?: boolean; maxRetries?: number }
+  options?: { resume?: boolean; maxRetries?: number; model?: string }
 ): Promise<string> {
   const { onChunk, onComplete, onError, onSearchComplete, onStep, onResume, onToolStart, onToolComplete, onElicitation, onElicitationDone } = callbacks;
   const maxRetries = options?.maxRetries ?? 2;
@@ -269,7 +269,7 @@ export async function streamChat(
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId, messages, mode, resume: isResume }),
+      body: JSON.stringify({ chatId, messages, mode, resume: isResume, model: options?.model }),
       signal,
     });
 

@@ -284,7 +284,7 @@ function VirtualizedMessageList({
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-3xl px-4">
+      <div className="mx-auto w-full max-w-3xl px-2">
         <div
           style={{
             height: `${virtualizer.getTotalSize()}px`,
@@ -339,6 +339,7 @@ function ChatPageInner() {
   const [input, setInput] = React.useState("");
   const [webSearch, setWebSearch] = React.useState(initialWebSearch);
   const [memoryDialogOpen, setMemoryDialogOpen] = React.useState(false);
+  const [currentModel, setCurrentModel] = React.useState("eryx-fast");
 
   const { activeElicitation, setActiveElicitation, dismissedIds, addDismissedId } = useElicitation();
 
@@ -427,7 +428,7 @@ function ChatPageInner() {
     async (value: string) => {
       setInput("");
       try {
-        await sendUserMessage(value, webSearch ? "web" : "chat");
+        await sendUserMessage(value, webSearch ? "web" : "chat", undefined, currentModel);
       } catch (err) {
         const error = err as { code?: string; message?: string; required?: number; current?: number; upgradeTo?: string };
         if (error.code === "CREDIT_ERROR") {
@@ -470,6 +471,8 @@ function ChatPageInner() {
               webSearchEnabled={webSearch}
               onWebSearchToggle={(enabled) => setWebSearch(enabled)}
               suggestionsEnabled={false}
+              currentModel={currentModel}
+              onModelChange={(model) => setCurrentModel(model)}
             />
           </div>
         </div>

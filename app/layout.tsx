@@ -7,8 +7,7 @@ import "../styles/hide-scrollbar.css";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import MainLayout from "./mainLayout";
 import { Toaster } from "@/components/ui/sileo-toast";
-import { StackProvider, StackTheme } from "@stackframe/stack";
-import { stackServerApp } from "@/src/stack/server";
+import { StackProviderWrapper } from "@/components/providers/stack-provider-wrapper";
 //import { PageTransitionProvider } from "@/components/shared/page-transition-provider";
 
 // const inter = Inter({
@@ -102,14 +101,12 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} ${sourceSerif.variable} [--font-code:var(--font-sans)] h-full antialiased scroll-smooth`}
     >
       <body className="min-h-dvh flex flex-col bg-background text-foreground">
-        <StackProvider app={stackServerApp}>
-          <StackTheme>
+        <StackProviderWrapper>
             <ThemeProvider defaultTheme="dark" attribute="class">
               <Toaster position="top-center" />
               <MainLayout>{children}</MainLayout>
             </ThemeProvider>
-          </StackTheme>
-        </StackProvider>
+          </StackProviderWrapper>
       </body>
     </html>
   );

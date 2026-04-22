@@ -24,7 +24,12 @@ import { useProjects } from "@/hooks/use-projects";
 import { useProjectDialogs } from "@/components/main/sidebar/dialogs/projects/create-project-context";
 import { useUser } from "@stackframe/stack";
 
-export type ResponseStyle = "normal" | "learning" | "concise" | "explanatory" | "formal";
+export type ResponseStyle =
+  | "normal"
+  | "learning"
+  | "concise"
+  | "explanatory"
+  | "formal";
 
 const RESPONSE_STYLES: { value: ResponseStyle; label: string }[] = [
   { value: "normal", label: "Normal" },
@@ -69,7 +74,9 @@ function ProjectSubmenu({
     return (
       <>
         <div className="px-2 py-2">
-          <p className="text-[11px] text-muted-foreground text-center">No projects</p>
+          <p className="text-[11px] text-muted-foreground text-center">
+            No projects
+          </p>
         </div>
         <button
           onClick={() => {
@@ -93,7 +100,7 @@ function ProjectSubmenu({
           "flex items-center gap-2 w-full px-2 py-1.5 text-[12px] rounded-md cursor-pointer transition-all",
           currentProjectId === null
             ? "text-primary font-medium bg-primary/10"
-            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
         )}
       >
         {currentProjectId === null ? (
@@ -105,7 +112,6 @@ function ProjectSubmenu({
       </button>
 
       <div className="border-t border-border/40 my-1" />
-
       {projects.map((project) => (
         <button
           key={project.id}
@@ -114,7 +120,7 @@ function ProjectSubmenu({
             "flex items-center gap-2 w-full px-2 py-1.5 text-[12px] rounded-md cursor-pointer transition-all",
             currentProjectId === project.id
               ? "text-primary font-medium bg-primary/10"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
         >
           {currentProjectId === project.id ? (
@@ -159,7 +165,7 @@ function StyleSubmenu({
             "flex items-center gap-2 w-full px-2 py-1.5 text-[12px] rounded-md cursor-pointer transition-all",
             currentStyle === style.value
               ? "text-primary font-medium bg-primary/10"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
           )}
         >
           {currentStyle === style.value ? (
@@ -195,15 +201,21 @@ export const MoreOptionsPopover = React.memo(function MoreOptionsPopover({
     setOpen(newOpen);
   };
 
-  const handleProjectSelect = React.useCallback((projectId: string | null) => {
-    onProjectSelect?.(projectId);
-    setOpen(false);
-  }, [onProjectSelect]);
+  const handleProjectSelect = React.useCallback(
+    (projectId: string | null) => {
+      onProjectSelect?.(projectId);
+      setOpen(false);
+    },
+    [onProjectSelect],
+  );
 
-  const handleStyleSelect = React.useCallback((style: ResponseStyle) => {
-    onStyleSelect?.(style);
-    setOpen(false);
-  }, [onStyleSelect]);
+  const handleStyleSelect = React.useCallback(
+    (style: ResponseStyle) => {
+      onStyleSelect?.(style);
+      setOpen(false);
+    },
+    [onStyleSelect],
+  );
 
   const handleFileSelect = React.useCallback(() => {
     onFileSelect();
@@ -218,18 +230,30 @@ export const MoreOptionsPopover = React.memo(function MoreOptionsPopover({
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-150 active:scale-95",
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-150 relative active:scale-95",
           !isAuthenticated
             ? "text-muted-foreground/30 hover:text-muted-foreground/50"
             : currentProjectId || currentStyle !== "normal"
-            ? "bg-primary/10 text-primary"
-            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/70"
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/70",
+          open && "ring-2 ring-primary/30"
         )}
       >
+        {(currentProjectId || currentStyle !== "normal") && !open && (
+          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full" />
+        )}
         <Tooltip>
-          <TooltipTrigger render={<div className="flex items-center justify-center h-full w-full"><Plus className="h-[14px] w-[14px]" /></div>} />
+          <TooltipTrigger
+            render={
+              <div className="flex items-center justify-center h-full w-full">
+                <Plus className="h-[14px] w-[14px]" />
+              </div>
+            }
+          />
           <TooltipContent side="bottom" sideOffset={8}>
-            {isAuthenticated ? "Add file, project, or style" : "Sign in to access options"}
+            {isAuthenticated
+              ? "Add file, project, or style"
+              : "Sign in to access options"}
           </TooltipContent>
         </Tooltip>
       </PopoverTrigger>
@@ -237,14 +261,14 @@ export const MoreOptionsPopover = React.memo(function MoreOptionsPopover({
         side="bottom"
         align="start"
         sideOffset={12}
-        className="w-48 p-1.5"
+        className="w-max p-1.5"
       >
         {/* Add file */}
         <button
           onClick={handleFileSelect}
           className="flex items-center gap-2.5 w-full px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-all active:scale-[0.98] rounded-md cursor-pointer"
         >
-          <FileText className="h-[14px] w-[14px] shrink-0" />
+          {/* <FileText className="h-[14px] w-[14px] shrink-0" /> */}
           <span className="font-medium">Add file</span>
         </button>
 
@@ -255,10 +279,8 @@ export const MoreOptionsPopover = React.memo(function MoreOptionsPopover({
             onMouseLeave={() => setProjectSubmenuOpen(false)}
             className="flex items-center gap-2.5 w-full px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-all rounded-md cursor-pointer"
           >
-            <FolderOpenDot className="h-[14px] w-[14px] shrink-0" />
-            <span className="flex-1 text-left font-medium">
-              Add to project
-            </span>
+            {/* <FolderOpenDot className="h-[14px] w-[14px] shrink-0" /> */}
+            <span className="flex-1 text-left font-medium">Add to project</span>
           </button>
 
           {projectSubmenuOpen && (
@@ -281,10 +303,8 @@ export const MoreOptionsPopover = React.memo(function MoreOptionsPopover({
             onMouseLeave={() => setStyleSubmenuOpen(false)}
             className="flex items-center gap-2.5 w-full px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-all rounded-md cursor-pointer"
           >
-            <span className="w-[14px] shrink-0" />
-            <span className="flex-1 text-left font-medium">
-              Style
-            </span>
+            {/* <span className="w-[14px] shrink-0" /> */}
+            <span className="flex-1 text-left font-medium">Style</span>
           </button>
 
           {styleSubmenuOpen && (

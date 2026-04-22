@@ -7,8 +7,8 @@ import { Chip } from "@/components/main/home/chip";
 import { PromptModal } from "@/components/main/home/prompt-modal";
 import { CHIPS, type ChipData } from "@/components/main/home/data";
 import { getTimeBasedHeading } from "@/components/main/home/data/headings";
-import { CreditsButton } from "@/components/main/header/credits-button";
-import { NotificationsButton } from "@/components/main/header/notifications-button";
+// import { CreditsButton } from "@/components/main/header/credits-button";
+// import { NotificationsButton } from "@/components/main/header/notifications-button";
 import { MemoryDialog } from "@/components/main/memory/memory-dialog";
 import { ShortcutHandler } from "@/components/main/shortcut-handler";
 import { AuthDialog } from "@/components/main/sidebar/dialogs/auth/auth-dialog";
@@ -84,11 +84,11 @@ export default function HomePage() {
 
   return (
     <div className="relative flex h-full min-h-[calc(100dvh-3rem)] flex-col bg-background md:min-h-dvh">
-      <div className="absolute right-4 top-2 z-10 flex items-center gap-1.5">
+      {/* <div className="absolute right-4 top-2 z-10 flex items-center gap-1.5">
         <CreditsButton />
-        {/* <NotificationsButton /> */}
-      </div>
-      <div className="flex flex-1 flex-col items-center px-6 pb-8 pt-12 md:justify-center">
+        <NotificationsButton /> 
+      </div> */}
+      <div className="flex flex-1 flex-col items-center px-2 pb-2 pt-12 md:justify-center">
         <div className="flex flex-1 flex-col items-center justify-center w-full md:flex-none">
           <h1
             suppressHydrationWarning
@@ -97,11 +97,11 @@ export default function HomePage() {
             {heading}
           </h1>
 
-          {/* <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
+           <div className="mb-6 xl:hidden flex flex-wrap items-center justify-center gap-2">
             {CHIPS.map((chip) => (
               <Chip key={chip.label} chip={chip} onOpen={setActiveChip} />
             ))}
-          </div> */}
+          </div> 
         </div>
 
         <div className="w-full max-w-2xl">
@@ -116,7 +116,7 @@ export default function HomePage() {
           />
         </div>
 
-         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+         <div className="mt-6 hidden xl:flex flex-wrap items-center justify-center gap-2">
             {CHIPS.map((chip) => (
               <Chip key={chip.label} chip={chip} onOpen={setActiveChip} />
             ))}

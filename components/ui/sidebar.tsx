@@ -38,6 +38,7 @@ type SidebarContextProps = {
   setOpen: (open: boolean) => void;
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
+  closeMobileSidebar: () => void;
   isMobile: boolean;
   toggleSidebar: () => void;
 };
@@ -97,6 +98,10 @@ function SidebarProvider({
     [setOpenProp, open],
   );
 
+  const closeMobileSidebar = React.useCallback(() => {
+    setOpenMobile(false);
+  }, [setOpenMobile]);
+
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
@@ -130,9 +135,10 @@ function SidebarProvider({
       isMobile,
       openMobile,
       setOpenMobile,
+      closeMobileSidebar,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, closeMobileSidebar, toggleSidebar],
   );
 
   return (
@@ -190,7 +196,7 @@ function Sidebar({
 
   if (isMobile) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <Sheet open={openMobile} onOpenChange={setOpenMobile}>
         <SheetContent
           dir={dir}
           data-sidebar="sidebar"

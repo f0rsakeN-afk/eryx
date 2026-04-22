@@ -437,7 +437,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { messages, chatId, mode, resume, style } = body;
+    const { messages, chatId, mode, resume, style, model: requestedModel } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(JSON.stringify({ error: "Messages required" }), {
@@ -472,8 +472,9 @@ export async function POST(req: NextRequest) {
     const { checkCreditsForOperation, deductCredits, addCredits } = await import("@/services/credit.service");
     const { polarConfig } = await import("@/lib/polar-config");
 
-    const model = aiConfig.model as keyof typeof polarConfig.creditCosts;
-    const cost = polarConfig.creditCosts[model] || 1;
+    // Map user-facing model name to internal model key
+    const modelKey = requestedModel || aiConfig.model;
+    const cost = polarConfig.creditCosts[modelKey as keyof typeof polarConfig.creditCosts] || polarConfig.creditCosts[aiConfig.model as keyof typeof polarConfig.creditCosts] || 1;
 
     // Try to resume existing stream if requested
     if (resume) {
@@ -531,7 +532,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check credits for new stream
-    const hasCredits = await checkCreditsForOperation(user.id, model);
+    const hasCredits = await checkCreditsForOperation(user.id, modelKey);
     if (!hasCredits) {
       const { getUserCredits } = await import("@/services/credit.service");
       const balance = await getUserCredits(user.id);
@@ -619,7 +620,7 @@ export async function POST(req: NextRequest) {
 
     // Deduct AI credits
     try {
-      await deductCredits(user.id, model);
+      await deductCredits(user.id, modelKey);
       creditsDeducted = true;
     } catch (error) {
       if (creditsDeducted) {
@@ -668,6 +669,7 @@ export async function POST(req: NextRequest) {
           tools: mcpTools,
           onToolCall: async (toolCalls, mcpClients) => executeMCPToolCalls(toolCalls, user.id, mcpClients),
           userId: user.id,
+          model: modelKey,
         },
         (chunk, isResume) => {
           // onChunk - content streamed to client via SSE

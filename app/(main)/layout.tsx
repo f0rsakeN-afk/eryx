@@ -2,13 +2,13 @@ import { cookies } from "next/headers";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/main/sidebar/app-sidebar";
 import { InitUser } from "@/components/init-user";
 import { ProjectDialogsProvider } from "@/components/main/sidebar/dialogs/projects/project-dialogs-provider";
 import { AuthGuard } from "@/components/main/auth-guard";
 import { AuthStatusProvider } from "@/components/main/auth-status-provider";
+import { MobileHeader } from "@/components/main/layout/mobile-header";
 import "../../styles/hide-scrollbar.css";
 
 export default async function MainLayout({
@@ -28,16 +28,11 @@ export default async function MainLayout({
       <SidebarInset className="min-h-0 overflow-hidden">
         <ProjectDialogsProvider>
           {/* Mobile top bar */}
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-2 md:hidden">
-            <SidebarTrigger className="-ml-1" />
-            {/* <span className="text-sm font-medium text-foreground">Eryx</span> */}
-          </header>
+          <MobileHeader />
 
           <InitUser />
           <AuthStatusProvider>
-            <AuthGuard>
-              {children}
-            </AuthGuard>
+            <AuthGuard>{children}</AuthGuard>
           </AuthStatusProvider>
         </ProjectDialogsProvider>
       </SidebarInset>

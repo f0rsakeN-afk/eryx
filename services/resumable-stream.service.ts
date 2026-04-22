@@ -62,6 +62,7 @@ interface StartStreamOptions {
   onToolEvent?: (event: { type: 'tool_call' | 'tool_result' | 'tool_error'; toolCallId?: string; toolName?: string; result?: unknown; error?: string | undefined }) => void;
   systemPrompt?: string;
   userId?: string;
+  model?: string;
 }
 
 function createRedisClient() {
@@ -291,7 +292,7 @@ export async function startResumableStream(
   stop: () => void;
 }> {
   const streamId = getStreamId(chatId);
-  const { tools, onToolCall, onToolEvent, systemPrompt, userId } = options || {};
+  const { tools, onToolCall, onToolEvent, systemPrompt, userId, model: requestedModel } = options || {};
 
   // Feature 4: Cross-Container Active Detection - check Redis first
   const isActiveRemotely = await getCrossContainerActiveStreams().then(
@@ -339,7 +340,7 @@ export async function startResumableStream(
         }
       }
 
-      const model = tools?.length ? aiConfig.modelWithTools : aiConfig.model;
+      const model = requestedModel || (tools?.length ? aiConfig.modelWithTools : aiConfig.model);
 
       // Build tools for ai-sdk - use MCP clients if available
       const aiTools: Record<string, any> = {};

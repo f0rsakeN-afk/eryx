@@ -32,10 +32,13 @@ export default function proxy(request: NextRequest) {
     return response;
   }
 
-  // Check for StackAuth session cookie
-  const sessionCookie = request.cookies.get("stack-session");
+  // Check for StackAuth session cookies (stack-access or stack-refresh-{projectId})
+  const cookies = request.cookies.getAll();
+  const hasStackSession = cookies.some((cookie) =>
+    cookie.name === "stack-access" || cookie.name.startsWith("stack-refresh-")
+  );
 
-  if (!sessionCookie) {
+  if (!hasStackSession) {
     const redirectUrl = new URL("/home", request.url);
     redirectUrl.searchParams.set("from", pathname);
     const response = NextResponse.redirect(redirectUrl);

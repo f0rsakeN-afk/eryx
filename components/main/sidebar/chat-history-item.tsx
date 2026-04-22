@@ -19,7 +19,7 @@ import {
   FolderPlus,
 } from "lucide-react";
 
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -325,6 +325,7 @@ export function ChatHistoryItem({
   isArchived = false,
 }: ChatHistoryItemProps) {
   const { prefetchOnHover } = useChatPrefetch();
+  const { closeMobileSidebar } = useSidebar();
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [renameOpen, setRenameOpen] = React.useState(false);
   const [downloadOpen, setDownloadOpen] = React.useState(false);
@@ -371,7 +372,7 @@ export function ChatHistoryItem({
       <SidebarMenuItem>
         <SidebarMenuButton
           render={
-            <Link href={`/chat/${item.id}`} className="flex min-w-0 items-center gap-2 pr-7" onMouseEnter={() => prefetchOnHover(item.id)}>
+            <Link href={`/chat/${item.id}`} onClick={closeMobileSidebar} className="flex min-w-0 items-center gap-2 pr-7" onMouseEnter={() => prefetchOnHover(item.id)}>
               <span className="flex-1 font-semibold tracking-wider truncate text-[12.5px]">
                 {item.parentChatId && (
                   <GitBranch className="inline-block h-3 w-3 mr-1.5 text-sidebar-foreground/40 align-text-bottom" />

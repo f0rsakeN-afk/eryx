@@ -34,9 +34,20 @@ export const polarConfig = {
 
   // Credit costs per operation
   creditCosts: {
-    "eryx-1": 1,
-    "eryx-1-fast": 1,
-    "eryx-1-pro": 5,
+    // From lib/ai/providers.ts - must match exactly
+    "eryx-fast": 1,
+    "eryx-nano": 1,
+    "eryx-standard": 2,
+    "eryx-plus": 2,
+    "eryx-pro": 3,
+    "eryx-ultra": 4,
+    "eryx-max": 5,
+    "eryx-next": 4,
+    "eryx-prime": 5,
+    "eryx-flash": 3,
+    "eryx-reason": 4,
+    "eryx-mini-o3": 2,
+    "eryx-mini-o4": 3,
     "web-search": 3,
     "file-analysis": 5,
     "image-generation": 20,

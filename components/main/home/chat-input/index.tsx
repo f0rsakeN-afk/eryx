@@ -192,7 +192,7 @@ export const ChatInput = React.memo(function ChatInput({
           className={cn(
             "block w-full resize-none bg-transparent px-4 py-4 pr-20",
             "text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/40",
-            "outline-none placeholder:font-light ",
+            "outline-none placeholder:font-light hide-scrollbar",
           )}
         />
 
