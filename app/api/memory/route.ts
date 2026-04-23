@@ -104,6 +104,40 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await validateAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const memoryId = searchParams.get("id");
+
+    if (!memoryId) {
+      return NextResponse.json({ error: "Memory ID required" }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const { title, content, tags, category, metadata } = body;
+
+    const { updateMemory } = await import("@/services/memory.service");
+
+    const memory = await updateMemory(memoryId, user.id, {
+      title,
+      content,
+      tags,
+      category,
+      metadata,
+    });
+
+    return NextResponse.json(memory);
+  } catch (error) {
+    console.error("Memory PUT error:", error);
+    return NextResponse.json({ error: "Failed to update memory" }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const user = await validateAuth(request);
