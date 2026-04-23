@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateAuth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import redis, { KEYS, TTL } from "@/lib/redis";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 // Model definitions with descriptions, capabilities and tier requirements
 const MODELS = [
@@ -197,6 +198,11 @@ function getUserTier(planTier: string | null): 'free' | 'pro' | 'max' {
 }
 
 export async function GET(req: NextRequest) {
+  const rateLimit = await checkApiRateLimit(req, "default");
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetAt);
+  }
+
   const user = await validateAuth(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

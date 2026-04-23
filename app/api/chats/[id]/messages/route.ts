@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getChatMessages, addChatMessage } from "@/lib/stack-server";
 import { validateAuth, AccountDeactivatedError } from "@/lib/auth";
 import { publishMessageNew } from "@/services/chat-pubsub.service";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await validateAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

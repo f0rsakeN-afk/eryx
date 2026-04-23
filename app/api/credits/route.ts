@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateAuth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import redis, { KEYS, TTL } from "@/lib/redis";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 interface CreditsCache {
   credits: {
@@ -31,6 +32,11 @@ interface CreditsCache {
 
 export async function GET(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await validateAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

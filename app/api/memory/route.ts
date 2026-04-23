@@ -9,10 +9,16 @@ import {
 } from "@/services/memory.service";
 import { checkMemoryLimit, getUserLimits } from "@/services/limit.service";
 import { createMemoryEmbeddings, deleteMemoryEmbeddings } from "@/lib/stack-server";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import prisma from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await validateAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,6 +44,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await validateAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

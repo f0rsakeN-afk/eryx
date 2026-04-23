@@ -8,6 +8,7 @@ import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
 import { updateSettingsSchema } from "@/schemas/validation";
 import { getUserSettings, invalidateUserSettingsCache } from "@/services/settings.service";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const DEFAULT_SETTINGS = {
   theme: "system",
@@ -31,6 +32,11 @@ const DEFAULT_SETTINGS = {
 
 export async function GET(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await stackServerApp.getUser({ tokenStore: request });
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
