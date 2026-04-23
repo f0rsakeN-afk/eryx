@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { stackServerApp } from "@/src/stack/server";
 import redis, { KEYS, TTL } from "@/lib/redis";
+import { validateCSRF, csrfErrorResponse } from "@/lib/csrf";
 
 const PUBLIC_PATHS = ["/", "/home"];
 const PUBLIC_API_PATHS = ["/api/auth", "/api/init-user", "/api/models"];
@@ -43,6 +44,17 @@ export default async function proxy(request: NextRequest) {
 
   // API routes need auth
   if (pathname.startsWith("/api/")) {
+    // CSRF protection for state-changing methods
+    // Skip for webhooks (they have signature validation) and public API paths
+    const isWebhook = pathname.includes("/webhook");
+    const isPublicApiPath = PUBLIC_API_PATHS.some((p) => pathname.startsWith(p));
+
+    if (!isWebhook && !isPublicApiPath && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      if (!validateCSRF(request)) {
+        return csrfErrorResponse();
+      }
+    }
+
     // Rate limiting check - get client IP
     const clientIP =
       request.headers.get("x-forwarded-for")?.split(",")[0] ||
