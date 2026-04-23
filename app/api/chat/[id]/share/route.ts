@@ -5,6 +5,7 @@ import { updateChat } from "@/lib/stack-server";
 import { logger } from "@/lib/logger";
 import { randomBytes, scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const scryptAsync = promisify(scrypt);
 
@@ -108,6 +109,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     console.log("[Share POST] Starting...");
     const user = await getOrCreateUser(request);
     console.log("[Share POST] User:", user?.id);

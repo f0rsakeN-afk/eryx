@@ -9,10 +9,16 @@ import {
 } from "@/services/memory.service";
 import { checkMemoryLimit, getUserLimits } from "@/services/limit.service";
 import { createMemoryEmbeddings, deleteMemoryEmbeddings } from "@/lib/stack-server";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import prisma from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await validateAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,6 +44,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await validateAuth(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -101,6 +112,40 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Memory POST error:", error);
     return NextResponse.json({ error: "Failed to add memory" }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await validateAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const memoryId = searchParams.get("id");
+
+    if (!memoryId) {
+      return NextResponse.json({ error: "Memory ID required" }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const { title, content, tags, category, metadata } = body;
+
+    const { updateMemory } = await import("@/services/memory.service");
+
+    const memory = await updateMemory(memoryId, user.id, {
+      title,
+      content,
+      tags,
+      category,
+      metadata,
+    });
+
+    return NextResponse.json(memory);
+  } catch (error) {
+    console.error("Memory PUT error:", error);
+    return NextResponse.json({ error: "Failed to update memory" }, { status: 500 });
   }
 }
 

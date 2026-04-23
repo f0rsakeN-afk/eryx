@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAuth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import redis, { KEYS, TTL } from "@/lib/redis";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 // Model definitions with descriptions, capabilities and tier requirements
 const MODELS = [
@@ -196,18 +198,45 @@ function getUserTier(planTier: string | null): 'free' | 'pro' | 'max' {
 }
 
 export async function GET(req: NextRequest) {
+  const rateLimit = await checkApiRateLimit(req, "default");
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetAt);
+  }
+
   const user = await validateAuth(req);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Get user's plan tier
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { planTier: true },
-  });
+  // Try cache first (user's plan tier rarely changes)
+  const cacheKey = KEYS.userPreferences(user.id);
+  let userTier: 'free' | 'pro' | 'max' = 'free';
 
-  const userTier = getUserTier(dbUser?.planTier ?? null);
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      userTier = getUserTier(parsed.planTier ?? null);
+    }
+  } catch {
+    // Redis error, fall through to DB
+  }
+
+  // If not cached, fetch from DB
+  if (userTier === 'free') {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { planTier: true },
+    });
+    userTier = getUserTier(dbUser?.planTier ?? null);
+
+    // Cache the tier (stale OK, we just need speed)
+    try {
+      await redis.setex(cacheKey, TTL.userPreferences, JSON.stringify({ planTier: dbUser?.planTier }));
+    } catch {
+      // Cache error, ignore
+    }
+  }
 
   // Add locked flag based on tier
   const modelsWithAccess = MODELS.map((model) => {

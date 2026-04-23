@@ -86,10 +86,41 @@ This document outlines planned improvements and features to be implemented.
 
 ---
 
+## Memory Feature (Priority: Medium)
+
+### Current State
+- Memory page connected to API via `useMemory` hook
+- Redis caching for search and list operations (TTL: 5 min)
+- Categories: work, personal, projects, ideas, important
+- Auto-generates embeddings for RAG on memory creation
+
+**Hooks:**
+- `useMemory()` - CRUD operations with optimistic updates
+
+**Files:**
+- `hooks/use-memory.ts` - API integration hook
+- `services/memory.service.ts` - Business logic with Redis caching
+- `app/api/memory/route.ts` - GET, POST, PUT, DELETE endpoints
+
+### Planned: File Upload for Memories
+- Currently text-only
+- Future: support for .md, .txt, .pdf attachments
+- Storage: S3 with presigned URLs
+- Metadata extraction for PDF content
+
+### Scalability Considerations
+- Redis cache invalidation on write operations
+- Cursor-based pagination for large memory sets
+- Embedding storage via vector database (pgvector)
+- Rate limiting on memory operations
+
+---
+
 ## Other Planned Improvements
 
 ### Performance
 - [ ] Implement Redis caching for frequently accessed data
+- [x] Redis caching for memory (already implemented)
 - [ ] Add database connection pooling
 - [ ] Optimize Prisma queries with select + include
 - [ ] Add CDN for static assets

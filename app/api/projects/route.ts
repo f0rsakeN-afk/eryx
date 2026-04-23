@@ -10,6 +10,7 @@ import prisma from "@/lib/prisma";
 import { getOrCreateUser, AccountDeactivatedError } from "@/lib/auth";
 import { getUserLimits } from "@/services/limit.service";
 import redis, { KEYS, TTL } from "@/lib/redis";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 interface ProjectCache {
   projects: Array<{
@@ -25,6 +26,11 @@ interface ProjectCache {
 
 export async function GET(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     // Validate auth and get user
     const user = await getOrCreateUser(request);
 

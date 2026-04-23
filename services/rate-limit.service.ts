@@ -26,7 +26,7 @@ export async function rateLimit(
   request: NextRequest,
   limitType: keyof typeof RATE_LIMITS = "default"
 ): Promise<{ success: boolean; remaining: number; resetAt: number }> {
-  // Skip rate limiting in development
+  // NEVER bypass rate limiting in production or non-dev environments
   if (process.env.NODE_ENV === "development" && process.env.DISABLE_RATE_LIMIT === "true") {
     return { success: true, remaining: 999, resetAt: Date.now() + 60000 };
   }

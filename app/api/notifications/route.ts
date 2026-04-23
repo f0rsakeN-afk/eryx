@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrCreateUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import redis, { KEYS, TTL, CHANNELS } from "@/lib/redis";
+import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 interface NotificationsCache {
   notifications: Array<{
@@ -33,6 +34,11 @@ interface NotificationsCache {
 
 export async function GET(request: NextRequest) {
   try {
+    const rateLimit = await checkApiRateLimit(request, "default");
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.resetAt);
+    }
+
     const user = await getOrCreateUser(request);
 
     const { searchParams } = new URL(request.url);
