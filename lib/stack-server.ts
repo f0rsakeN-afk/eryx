@@ -542,6 +542,13 @@ export async function addChatMessage(
     // Redis error, ignore
   }
 
+  // Invalidate file contents cache since new message may affect which files are relevant
+  try {
+    await redis.del(KEYS.chatFileContents(chatId));
+  } catch {
+    // Redis error, ignore
+  }
+
   return message;
 }
 

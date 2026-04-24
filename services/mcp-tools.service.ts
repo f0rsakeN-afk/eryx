@@ -113,7 +113,11 @@ export async function getMCPToolsForChat(userId: string): Promise<MCPTool[]> {
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
-      return JSON.parse(cached) as MCPTool[];
+      try {
+        return JSON.parse(cached) as MCPTool[];
+      } catch {
+        console.warn('[MCP] Cache parse error, fetching fresh');
+      }
     }
   } catch (err) {
     console.warn('[MCP] Cache read error:', err);

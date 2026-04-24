@@ -77,6 +77,7 @@ export const KEYS = {
   mcpCatalog: "mcp:catalog",
   mcpTools: (userId: string) => `mcp:${userId}:tools`,
   chatPartial: (chatId: string) => `chat:${chatId}:partial`,
+  chatFileContents: (chatId: string) => `chat:${chatId}:file_contents`,
   activeStreams: () => "active:streams",
   resumeReady: (chatId: string) => `resume:${chatId}:ready`,
   streamVersion: (chatId: string) => `chat:${chatId}:stream:version`,
@@ -107,6 +108,7 @@ export const TTL = {
   mcpCatalog: 10 * 60, // 10 minutes for MCP catalog (rarely changes)
   mcpTools: 5 * 60, // 5 minutes for user MCP tools cache
   chatPartial: 24 * 60 * 60, // 24 hours for partial stream data
+  chatFileContents: 60 * 60, // 1 hour for chat file contents (invalidated on new message)
   activeStreams: 60, // 1 minute for active stream tracking (short, refreshed frequently)
   resumeReady: 5 * 60, // 5 minutes for resume ready signal
   streamVersion: 24 * 60 * 60, // 24 hours for stream version tracking

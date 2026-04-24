@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JsonToSseTransformStream } from "ai";
 import prisma from "@/lib/prisma";
-import redis, { KEYS } from "@/lib/redis";
+import redis, { KEYS, TTL } from "@/lib/redis";
 import { buildSystemPrompt, type PromptConfig, type ResponseStyle } from "@/lib/prompts";
 import { validateAuth, AccountDeactivatedError } from "@/lib/auth";
 import { aiConfig } from "@/lib/config";
@@ -67,45 +67,74 @@ function extractDomain(url: string): string {
 /**
  * Get extracted content from files attached to recent chat messages
  * Uses keyword matching to prioritize relevant content for large files
+ * Results cached per chat with 1-hour TTL
  */
 async function getChatFileContents(
   chatId: string,
   incomingMessages?: Array<{ role: string; content: string }>
 ): Promise<Array<{ name: string; content: string }>> {
-  // Get recent messages with their file attachments
-  const recentMessages = await prisma.message.findMany({
-    where: { chatId },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-    select: {
-      id: true,
-      messageFiles: {
-        select: {
-          file: {
-            select: {
-              id: true,
-              name: true,
-              extractedContent: true,
-              tokenCount: true,
+  const cacheKey = KEYS.chatFileContents(chatId);
+
+  // Try cache first
+  let fileMap: Map<string, { name: string; content: string; tokenCount: number }>;
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      try {
+        fileMap = new Map(JSON.parse(cached) as [string, { name: string; content: string; tokenCount: number }][]);
+      } catch {
+        console.warn('[Chat] File contents cache parse error, fetching fresh');
+        fileMap = undefined;
+      }
+    }
+  } catch (err) {
+    console.warn('[Chat] File contents cache read error:', err);
+  }
+
+  // Cache miss - fetch from DB
+  if (!fileMap) {
+    // Get recent messages with their file attachments
+    const recentMessages = await prisma.message.findMany({
+      where: { chatId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        messageFiles: {
+          select: {
+            file: {
+              select: {
+                id: true,
+                name: true,
+                extractedContent: true,
+                tokenCount: true,
+              },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  // Collect unique files with their contents
-  const fileMap = new Map<string, { name: string; content: string; tokenCount: number }>();
-  for (const msg of recentMessages) {
-    for (const mf of msg.messageFiles) {
-      const file = mf.file;
-      if (file.extractedContent && !fileMap.has(file.id)) {
-        fileMap.set(file.id, {
-          name: file.name,
-          content: file.extractedContent,
-          tokenCount: file.tokenCount || Math.ceil(file.extractedContent.length / 4),
-        });
+    // Collect unique files with their contents
+    fileMap = new Map<string, { name: string; content: string; tokenCount: number }>();
+    for (const msg of recentMessages) {
+      for (const mf of msg.messageFiles) {
+        const file = mf.file;
+        if (file.extractedContent && !fileMap.has(file.id)) {
+          fileMap.set(file.id, {
+            name: file.name,
+            content: file.extractedContent,
+            tokenCount: file.tokenCount || Math.ceil(file.extractedContent.length / 4),
+          });
+        }
       }
+    }
+
+    // Store in cache (errors are non-fatal)
+    try {
+      await redis.setex(cacheKey, TTL.chatFileContents, JSON.stringify([...fileMap]));
+    } catch (err) {
+      console.warn('[Chat] File contents cache write error:', err);
     }
   }
 
