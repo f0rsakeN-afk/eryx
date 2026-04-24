@@ -476,7 +476,6 @@ function ChatPageInner() {
     [sendUserMessage, webSearch, currentModel],
   );
 
-  if (isLoading) return <div />;
   if (isError) return <ErrorState onRetry={refetch} />;
 
   return (
