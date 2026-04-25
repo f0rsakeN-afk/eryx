@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Terminal,
   Database,
@@ -151,6 +152,7 @@ const STEPS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -174,6 +176,8 @@ export default function OnboardingPage() {
       });
 
       if (response.ok) {
+        // Invalidate auth status cache so home page sees updated seenOnboarding
+        queryClient.invalidateQueries({ queryKey: ["auth-status"] });
         // Save profession to cookie for persistence (localStorage can be cleared)
         if (formData.profession) {
           document.cookie = `eryx_profession=${formData.profession}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;

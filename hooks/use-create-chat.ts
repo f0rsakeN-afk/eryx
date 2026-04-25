@@ -138,11 +138,40 @@ export function useCreateChat(options: UseCreateChatOptions = {}): UseCreateChat
     onSuccess: (data, firstMessage) => {
       logger.info("Chat created", { chatId: data.id, projectId });
 
-      // Invalidate to ensure fresh data from server
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
+      // Replace temp chat with real chat in cache, removing any duplicate that arrived via SSE
+      queryClient.setQueryData<ChatListResponse>(
+        ["chats"],
+        (old) => {
+          if (!old) return old;
+          // Remove any existing entry with real ID (from SSE chat:created) to avoid duplicates
+          const filteredChats = old.chats.filter((c) => c.id !== data.id);
+          return {
+            ...old,
+            chats: filteredChats.map((c) =>
+              c.id.startsWith("temp-") ? { ...c, id: data.id } : c
+            ),
+          };
+        }
+      );
       if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ["project-chats", projectId] });
+        queryClient.setQueryData<ChatListResponse>(
+          ["project-chats", projectId],
+          (old) => {
+            if (!old) return old;
+            const filteredChats = old.chats.filter((c) => c.id !== data.id);
+            return {
+              ...old,
+              chats: filteredChats.map((c) =>
+                c.id.startsWith("temp-") ? { ...c, id: data.id } : c
+              ),
+            };
+          }
+        );
       }
+
+      // Navigation happens before invalidation, so the new chat page will load fresh data
+      // No need to invalidate - cache already has correct data with real ID
+      // Invalidation only on error for cleanup
 
       // Navigate to the new chat
       onBeforeNavigate?.(data.id, firstMessage ?? "");

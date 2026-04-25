@@ -464,6 +464,12 @@ CREATE INDEX "User_role_idx" ON "User"("role");
 CREATE INDEX "User_planTier_idx" ON "User"("planTier");
 
 -- CreateIndex
+CREATE INDEX "User_planId_idx" ON "User"("planId");
+
+-- CreateIndex
+CREATE INDEX "User_updatedAt_idx" ON "User"("updatedAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Chat_shareToken_key" ON "Chat"("shareToken");
 
 -- CreateIndex
@@ -491,6 +497,9 @@ CREATE INDEX "Chat_parentChatId_idx" ON "Chat"("parentChatId");
 CREATE INDEX "Chat_userId_archivedAt_idx" ON "Chat"("userId", "archivedAt");
 
 -- CreateIndex
+CREATE INDEX "Chat_title_idx" ON "Chat"("title");
+
+-- CreateIndex
 CREATE INDEX "Message_chatId_idx" ON "Message"("chatId");
 
 -- CreateIndex
@@ -500,6 +509,12 @@ CREATE INDEX "Message_parentId_idx" ON "Message"("parentId");
 CREATE INDEX "Message_chatId_createdAt_idx" ON "Message"("chatId", "createdAt");
 
 -- CreateIndex
+CREATE INDEX "Message_sender_idx" ON "Message"("sender");
+
+-- CreateIndex
+CREATE INDEX "Message_updatedAt_idx" ON "Message"("updatedAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "ChatSummary_chatId_key" ON "ChatSummary"("chatId");
 
 -- CreateIndex
@@ -507,6 +522,12 @@ CREATE INDEX "ChatSummary_chatId_idx" ON "ChatSummary"("chatId");
 
 -- CreateIndex
 CREATE INDEX "ChatSummary_parentSummaryId_idx" ON "ChatSummary"("parentSummaryId");
+
+-- CreateIndex
+CREATE INDEX "ChatSummary_createdAt_idx" ON "ChatSummary"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "ChatSummary_updatedAt_idx" ON "ChatSummary"("updatedAt");
 
 -- CreateIndex
 CREATE INDEX "File_type_idx" ON "File"("type");
@@ -519,6 +540,12 @@ CREATE INDEX "File_status_idx" ON "File"("status");
 
 -- CreateIndex
 CREATE INDEX "File_projectId_status_idx" ON "File"("projectId", "status");
+
+-- CreateIndex
+CREATE INDEX "File_createdAt_idx" ON "File"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "File_name_idx" ON "File"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Project_name_key" ON "Project"("name");
@@ -534,6 +561,12 @@ CREATE INDEX "Project_pinnedAt_idx" ON "Project"("pinnedAt");
 
 -- CreateIndex
 CREATE INDEX "Project_name_idx" ON "Project"("name");
+
+-- CreateIndex
+CREATE INDEX "Project_createdAt_idx" ON "Project"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "Project_updatedAt_idx" ON "Project"("updatedAt");
 
 -- CreateIndex
 CREATE INDEX "Report_userId_idx" ON "Report"("userId");
@@ -587,6 +620,9 @@ CREATE INDEX "Memory_userId_category_idx" ON "Memory"("userId", "category");
 CREATE INDEX "Memory_createdAt_idx" ON "Memory"("createdAt");
 
 -- CreateIndex
+CREATE INDEX "Memory_updatedAt_idx" ON "Memory"("updatedAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "OnboardingData_userId_key" ON "OnboardingData"("userId");
 
 -- CreateIndex
@@ -617,6 +653,12 @@ CREATE INDEX "Plan_tier_idx" ON "Plan"("tier");
 CREATE INDEX "Plan_isActive_isVisible_idx" ON "Plan"("isActive", "isVisible");
 
 -- CreateIndex
+CREATE INDEX "Plan_createdAt_idx" ON "Plan"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "Plan_updatedAt_idx" ON "Plan"("updatedAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Subscription_userId_key" ON "Subscription"("userId");
 
 -- CreateIndex
@@ -633,6 +675,15 @@ CREATE INDEX "Subscription_polarCustomerId_idx" ON "Subscription"("polarCustomer
 
 -- CreateIndex
 CREATE INDEX "Subscription_currentPeriodEnd_idx" ON "Subscription"("currentPeriodEnd");
+
+-- CreateIndex
+CREATE INDEX "Subscription_planId_idx" ON "Subscription"("planId");
+
+-- CreateIndex
+CREATE INDEX "Subscription_createdAt_idx" ON "Subscription"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "Subscription_updatedAt_idx" ON "Subscription"("updatedAt");
 
 -- CreateIndex
 CREATE INDEX "PushSubscription_userId_idx" ON "PushSubscription"("userId");

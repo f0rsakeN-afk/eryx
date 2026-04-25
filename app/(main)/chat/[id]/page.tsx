@@ -6,7 +6,6 @@ import { useSearchParams, useParams } from "next/navigation";
 import { toast } from "@/components/ui/sileo-toast";
 import { useChatMessages } from "@/hooks/use-chat-messages";
 import { useChatStream } from "@/hooks/useChatStream";
-import { ChatInput } from "@/components/main/home/chat-input";
 import type { Message } from "@/services/chat.service";
 import { SplitViewContext } from "@/components/main/chat/split-view-context";
 import { useOptimizedScroll } from "@/hooks/use-optimized-scroll";
@@ -31,7 +30,6 @@ const ChatMessage = dynamic(
     })),
   {
     ssr: false,
-    // loading: () => <MessageSkeleton />,
   },
 );
 
@@ -39,6 +37,27 @@ const SystemDesignCanvas = dynamic(
   () =>
     import("@/components/main/chat/format/system-design").then((m) => ({
       default: m.SystemDesignCanvas,
+    })),
+  { ssr: false },
+);
+
+const ChatInput = dynamic(
+  () =>
+    import("@/components/main/home/chat-input").then((m) => ({
+      default: m.ChatInput,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[120px] border-t border-border/50 bg-background/50 animate-pulse" />
+    ),
+  },
+);
+
+const SplitViewProvider = dynamic(
+  () =>
+    import("@/components/main/chat/split-view-context").then((m) => ({
+      default: m.SplitViewProvider,
     })),
   { ssr: false },
 );
@@ -400,18 +419,19 @@ function ChatPageInner() {
   }, [messages]);
 
   // Subscribe to real-time message updates from other devices
+  const handleNewMessage = React.useCallback((message: Message) => {
+    if (message.role === "assistant") {
+      toast("New AI response", {
+        description:
+          message.content.slice(0, 100) +
+          (message.content.length > 100 ? "..." : ""),
+      });
+    }
+  }, []);
+
   useChatStream({
     chatId,
-    onNewMessage: (message) => {
-      // Only show toast if message is from AI (someone else using the account)
-      if (message.role === "assistant") {
-        toast("New AI response", {
-          description:
-            message.content.slice(0, 100) +
-            (message.content.length > 100 ? "..." : ""),
-        });
-      }
-    },
+    onNewMessage: handleNewMessage,
   });
 
   // Handle MCP elicitation events via useChatMessages callback
@@ -476,7 +496,6 @@ function ChatPageInner() {
     [sendUserMessage, webSearch, currentModel],
   );
 
-  if (isLoading) return <div />;
   if (isError) return <ErrorState onRetry={refetch} />;
 
   return (

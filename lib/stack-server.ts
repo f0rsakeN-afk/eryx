@@ -286,18 +286,8 @@ export async function updateChat(
   userId: string,
   data: { title?: string; archivedAt?: Date | null; projectId?: string | null; pinnedAt?: Date | null; visibility?: string; shareExpiry?: Date | null; shareToken?: string | null; sharePassword?: string | null }
 ) {
-  // Verify ownership first
-  const existing = await prisma.chat.findFirst({
-    where: { id: chatId, userId },
-    select: { id: true, userId: true },
-  });
-
-  if (!existing) {
-    throw new Error("Chat not found");
-  }
-
   const chat = await prisma.chat.update({
-    where: { id: chatId },
+    where: { id: chatId, userId },
     data: {
       ...data,
       ...(data.title && { title: data.title }),
@@ -357,19 +347,13 @@ export async function updateChat(
 }
 
 export async function deleteChat(chatId: string, userId: string) {
-  // Verify ownership first
-  const existing = await prisma.chat.findFirst({
+  const result = await prisma.chat.deleteMany({
     where: { id: chatId, userId },
-    select: { id: true },
   });
 
-  if (!existing) {
+  if (result.count === 0) {
     throw new Error("Chat not found");
   }
-
-  await prisma.chat.delete({
-    where: { id: chatId },
-  });
 
   // Clear cache
   await redis.del(KEYS.chatMessages(chatId));
@@ -402,8 +386,9 @@ export async function getChatMessages(
 ) {
   // Try cache first (only for "before" direction with no cursor)
   if (!cursor && direction === "before") {
-    const cached = await redis.lrange(KEYS.chatMessages(chatId), 0, -1);
-    if (cached.length >= limit) {
+    const cachedLen = await redis.llen(KEYS.chatMessages(chatId));
+    if (cachedLen >= limit) {
+      const cached = await redis.lrange(KEYS.chatMessages(chatId), 0, limit - 1);
       const messages = cached.map((m: string) => JSON.parse(m));
       // Cache stores messages in chronological order (oldest first)
       // For "before" direction we need chronological, so no reverse needed
@@ -464,7 +449,10 @@ export async function getChatMessages(
       );
     });
     pipeline.expire(KEYS.chatMessages(chatId), TTL.chatMessages);
-    await pipeline.exec();
+    const results = await pipeline.exec();
+    if (results?.some(([err]) => err)) {
+      console.warn("[getChatMessages] Redis pipeline error:", results);
+    }
   }
 
   return {
@@ -492,11 +480,6 @@ export async function addChatMessage(
   });
 
   if (!chat) {
-    // Debug: check what chat actually exists
-    const anyChat = await prisma.chat.findUnique({
-      where: { id: chatId },
-      select: { id: true, userId: true },
-    });
     throw new Error("Chat not found");
   }
 
@@ -542,7 +525,7 @@ export async function addChatMessage(
   await redis.publish(
     CHANNELS.chat(chatId),
     JSON.stringify({
-      type: "message:new",
+      type: "chat:message:new",
       message: {
         id: message.id,
         role: message.role,
@@ -555,6 +538,13 @@ export async function addChatMessage(
   // Invalidate user chat list cache (new message changes chat's updatedAt sort order)
   try {
     await redis.del(KEYS.userChats(userId));
+  } catch {
+    // Redis error, ignore
+  }
+
+  // Invalidate file contents cache since new message may affect which files are relevant
+  try {
+    await redis.del(KEYS.chatFileContents(chatId));
   } catch {
     // Redis error, ignore
   }
