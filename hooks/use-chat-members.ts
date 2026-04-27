@@ -16,7 +16,8 @@ export function useChatMembers(chatId: string | undefined) {
     queryKey: ["chat", chatId, "members"],
     queryFn: () => getChatMembers(chatId!),
     enabled: !!chatId,
-    staleTime: 30000, // 30 seconds
+    staleTime: 10000, // 10 seconds - keep fresh for collaboration
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   const addMemberMutation = useMutation({
@@ -24,6 +25,8 @@ export function useChatMembers(chatId: string | undefined) {
       addChatMember(chatId!, userId, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chat", chatId, "members"] });
+      // Also invalidate presence since member list affects collaboration visibility
+      queryClient.invalidateQueries({ queryKey: ["chat", chatId, "presence"] });
     },
   });
 
@@ -39,6 +42,8 @@ export function useChatMembers(chatId: string | undefined) {
     mutationFn: (userId: string) => removeChatMember(chatId!, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chat", chatId, "members"] });
+      // Also invalidate presence since member list affects collaboration visibility
+      queryClient.invalidateQueries({ queryKey: ["chat", chatId, "presence"] });
     },
   });
 

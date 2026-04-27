@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { validateAuth, AccountDeactivatedError } from "@/lib/auth";
 import { invalidateMemberCache, invalidateRoleCache } from "@/lib/chat-access";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { publishMemberAdded } from "@/services/chat-pubsub.service";
 
 /**
  * GET /api/invites/:token - Get invitation details (public, requires auth)
@@ -214,6 +215,9 @@ export async function POST(
       invalidateMemberCache(newMember.chatId),
       invalidateRoleCache(newMember.chatId, user.id),
     ]);
+
+    // Publish member added event for real-time collaboration updates
+    await publishMemberAdded(newMember.chatId, newMember.userId);
 
     return NextResponse.json({
       success: true,

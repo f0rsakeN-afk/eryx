@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useChatMembers } from "@/hooks/use-chat-members";
 import { useChatPresence } from "@/hooks/use-chat-presence";
 import { cn } from "@/lib/utils";
@@ -12,21 +12,37 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Users,
   Crown,
   Eye,
   Pencil,
+  MoreHorizontal,
   Trash2,
-  Copy,
-  Check,
   Loader2,
-  ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
+import type { ChatMemberWithUser } from "@/services/collaboration.service";
 
 interface ChatMembersDialogProps {
   chatId: string;
@@ -35,6 +51,150 @@ interface ChatMembersDialogProps {
   onClose: () => void;
   onInvite: () => void;
 }
+
+const ROLE_CONFIG = {
+  OWNER: {
+    label: "Owner",
+    icon: Crown,
+    badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    iconClass: "text-amber-500",
+  },
+  EDITOR: {
+    label: "Editor",
+    icon: Pencil,
+    badgeClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    iconClass: "text-blue-500",
+  },
+  VIEWER: {
+    label: "Viewer",
+    icon: Eye,
+    badgeClass: "bg-muted text-muted-foreground",
+    iconClass: "text-muted-foreground",
+  },
+} as const;
+
+interface MemberRowProps {
+  member: ChatMemberWithUser;
+  isActive: boolean;
+  isCurrentUser: boolean;
+  canManage: boolean;
+  isUpdating: boolean;
+  isRemoving: boolean;
+  onRoleChange: (role: "EDITOR" | "VIEWER") => void;
+  onRemove: () => void;
+}
+
+const MemberRow = React.memo(function MemberRow({
+  member,
+  isActive,
+  isCurrentUser,
+  canManage,
+  isUpdating,
+  isRemoving,
+  onRoleChange,
+  onRemove,
+}: MemberRowProps) {
+  const config = ROLE_CONFIG[member.role];
+  const RoleIcon = config.icon;
+  const initial = member.user.email?.[0]?.toUpperCase() || "?";
+
+  return (
+    <div className="group flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-all duration-200">
+      <div className="relative shrink-0">
+        <div className="h-10 w-10 rounded-full bg-linear-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+          <span className="text-sm font-medium">{initial}</span>
+        </div>
+        {isActive && (
+          <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium truncate">
+            {isCurrentUser ? "You" : member.user.email?.split("@")[0]}
+          </p>
+          {isCurrentUser && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              You
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <Badge variant="outline" className={cn("text-xs gap-1.5 py-0", config.badgeClass)}>
+            <RoleIcon className={cn("h-3 w-3", config.iconClass)} />
+            {config.label}
+          </Badge>
+          {isActive && (
+            <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              Active
+            </span>
+          )}
+        </div>
+      </div>
+
+      {canManage && (
+        <DropdownMenu>
+          <DropdownMenuTrigger className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md hover:bg-muted">
+            <MoreHorizontal className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {member.role === "VIEWER" && (
+              <DropdownMenuItem onClick={() => onRoleChange("EDITOR")} disabled={isUpdating} className="gap-2">
+                <Pencil className="h-4 w-4 text-blue-500" />
+                Make Editor
+              </DropdownMenuItem>
+            )}
+            {member.role === "EDITOR" && (
+              <DropdownMenuItem onClick={() => onRoleChange("VIEWER")} disabled={isUpdating} className="gap-2">
+                <Eye className="h-4 w-4" />
+                Make Viewer
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onRemove} disabled={isRemoving} className="gap-2 text-destructive focus:text-destructive">
+              <Trash2 className="h-4 w-4" />
+              Remove Member
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+});
+
+function MemberSkeleton() {
+  return (
+    <div className="flex items-center gap-3 p-3">
+      <Skeleton className="h-10 w-10 rounded-full" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-5 w-16" />
+      </div>
+      <Skeleton className="h-8 w-20" />
+    </div>
+  );
+}
+const MemoizedMemberSkeleton = React.memo(MemberSkeleton);
+
+const EmptyState = React.memo(function EmptyState({ onInvite }: { onInvite: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+        <Users className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <p className="text-sm font-medium text-foreground mb-1">No members yet</p>
+      <p className="text-xs text-muted-foreground mb-4">
+        Invite others to collaborate on this chat
+      </p>
+      <Button size="sm" onClick={onInvite}>
+        <ShieldCheck className="h-4 w-4 mr-2" />
+        Invite Members
+      </Button>
+    </div>
+  );
+});
 
 export function ChatMembersDialog({
   chatId,
@@ -47,159 +207,131 @@ export function ChatMembersDialog({
     useChatMembers(chatId);
   const { activeUsers } = useChatPresence(chatId);
 
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
 
-  const activeUserIds = new Set(activeUsers.map((u) => u.userId));
-
-  const copyEmail = async (email: string, memberId: string) => {
-    await navigator.clipboard.writeText(email);
-    setCopiedId(memberId);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "OWNER":
-        return <Crown className="h-3 w-3 text-amber-500" />;
-      case "EDITOR":
-        return <Pencil className="h-3 w-3 text-blue-500" />;
-      default:
-        return <Eye className="h-3 w-3 text-muted-foreground" />;
-    }
-  };
-
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case "OWNER":
-        return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-      case "EDITOR":
-        return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const canManageMembers = members.some(
-    (m) => m.userId === currentUserId && m.role === "OWNER"
+  const activeUserIds = useMemo(() => new Set(activeUsers.map((u) => u.userId)), [activeUsers]);
+  const isCurrentUserOwner = useMemo(
+    () => members.some((m) => m.userId === currentUserId && m.role === "OWNER"),
+    [members, currentUserId]
   );
 
+  const handleRoleChange = useCallback(
+    (userId: string, newRole: "EDITOR" | "VIEWER") => {
+      updateRole({ userId, role: newRole });
+    },
+    [updateRole]
+  );
+
+  const handleRemoveConfirm = useCallback(async () => {
+    if (memberToRemove) {
+      await removeMember(memberToRemove);
+      setMemberToRemove(null);
+    }
+  }, [memberToRemove, removeMember]);
+
+  const handleRemoveRequest = useCallback((userId: string) => {
+    setMemberToRemove(userId);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setMemberToRemove(null);
+    onClose();
+  }, [onClose]);
+
+  const memberRows = useMemo(() => {
+    return members.map((member) => {
+      const isActive = activeUserIds.has(member.userId);
+      const isCurrentUser = member.userId === currentUserId;
+      const canManage = isCurrentUserOwner && !isCurrentUser && member.role !== "OWNER";
+
+      return (
+        <MemberRow
+          key={member.id}
+          member={member}
+          isActive={isActive}
+          isCurrentUser={isCurrentUser}
+          canManage={canManage}
+          isUpdating={isUpdating}
+          isRemoving={isRemoving}
+          onRoleChange={(role) => handleRoleChange(member.userId, role)}
+          onRemove={() => handleRemoveRequest(member.userId)}
+        />
+      );
+    });
+  }, [members, activeUserIds, currentUserId, isCurrentUserOwner, isUpdating, isRemoving, handleRoleChange, handleRemoveRequest]);
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Chat Members
-          </DialogTitle>
-          <DialogDescription>
-            Manage who has access to this chat
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex items-center justify-between py-3 border-b">
-          <p className="text-sm text-muted-foreground">
-            {members.length} member{members.length !== 1 ? "s" : ""}
-          </p>
-          {canManageMembers && (
-            <Button size="sm" onClick={onInvite}>
-              Invite
-            </Button>
-          )}
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-3 py-2">
-              {members.map((member) => {
-                const isActive = activeUserIds.has(member.userId);
-                const isCurrentUser = member.userId === currentUserId;
-
-                return (
-                  <div
-                    key={member.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="relative">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={undefined} />
-                        <AvatarFallback className="text-xs">
-                          {member.user.email?.[0]?.toUpperCase() || "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      {isActive && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">
-                          {isCurrentUser ? "You" : member.user.email}
-                        </p>
-                        {isActive && (
-                          <span className="text-xs text-green-600 dark:text-green-400">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge
-                          variant="outline"
-                          className={cn("text-xs gap-1", getRoleBadgeColor(member.role))}
-                        >
-                          {getRoleIcon(member.role)}
-                          {member.role}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {!isCurrentUser && canManageMembers && member.role !== "OWNER" && (
-                      <div className="flex items-center gap-1">
-                        {member.role === "VIEWER" ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={() => updateRole({ userId: member.userId, role: "EDITOR" })}
-                            disabled={isUpdating}
-                          >
-                            <Pencil className="h-3 w-3 mr-1" />
-                            Make Editor
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={() => updateRole({ userId: member.userId, role: "VIEWER" })}
-                            disabled={isUpdating}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Make Viewer
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-destructive hover:text-destructive"
-                          onClick={() => removeMember(member.userId)}
-                          disabled={isRemoving}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base">Chat Members</DialogTitle>
+                  <DialogDescription className="text-xs mt-0.5">
+                    {members.length} member{members.length !== 1 ? "s" : ""}
+                  </DialogDescription>
+                </div>
+              </div>
+              {isCurrentUserOwner && (
+                <Button size="sm" onClick={onInvite} className="gap-2">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Invite
+                </Button>
+              )}
             </div>
-          </ScrollArea>
-        )}
-      </DialogContent>
-    </Dialog>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden">
+            {isLoading ? (
+              <div className="px-6 py-4 space-y-2">
+                <MemoizedMemberSkeleton />
+                <MemoizedMemberSkeleton />
+                <MemoizedMemberSkeleton />
+              </div>
+            ) : members.length === 0 ? (
+              <EmptyState onInvite={onInvite} />
+            ) : (
+              <ScrollArea className="h-full px-6 py-3">
+                <div className="space-y-1">
+                  {memberRows}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!memberToRemove} onOpenChange={(open) => !open && setMemberToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this member? They will lose access to this chat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRemoving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

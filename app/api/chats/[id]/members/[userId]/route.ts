@@ -7,6 +7,7 @@ import {
   invalidateRoleCache,
 } from "@/lib/chat-access";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { publishMemberAdded, publishMemberRemoved, publishMemberRoleChanged } from "@/services/chat-pubsub.service";
 
 /**
  * PATCH /api/chats/:id/members/:userId - Update a member's role
@@ -100,6 +101,9 @@ export async function PATCH(
       invalidateRoleCache(chatId, targetUserId),
     ]);
 
+    // Publish role changed event for real-time collaboration updates
+    await publishMemberRoleChanged(chatId, targetUserId, role);
+
     return NextResponse.json({ member });
   } catch (error) {
     if (error instanceof AccountDeactivatedError) {
@@ -191,6 +195,9 @@ export async function DELETE(
       invalidateMemberCache(chatId),
       invalidateRoleCache(chatId, targetUserId),
     ]);
+
+    // Publish member removed event for real-time collaboration updates
+    await publishMemberRemoved(chatId, targetUserId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

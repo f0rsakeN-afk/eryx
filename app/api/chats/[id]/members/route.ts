@@ -7,6 +7,7 @@ import {
   invalidateRoleCache,
 } from "@/lib/chat-access";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { publishMemberAdded } from "@/services/chat-pubsub.service";
 
 /**
  * GET /api/chats/:id/members - List all members of a chat
@@ -168,6 +169,9 @@ export async function POST(
       invalidateMemberCache(chatId),
       invalidateRoleCache(chatId, targetUserId),
     ]);
+
+    // Publish member added event for real-time collaboration updates
+    await publishMemberAdded(chatId, member.userId);
 
     return NextResponse.json({ member }, { status: 201 });
   } catch (error) {

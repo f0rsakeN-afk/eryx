@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "@/components/ui/sileo-toast";
 import { useChatMessages } from "@/hooks/use-chat-messages";
 import { useChatStream } from "@/hooks/useChatStream";
+import { useAuthStatusContext } from "@/components/main/auth-status-provider";
 import type { Message } from "@/services/chat.service";
 import { SplitViewContext } from "@/components/main/chat/split-view-context";
 import { useOptimizedScroll } from "@/hooks/use-optimized-scroll";
@@ -19,6 +20,11 @@ import {
   ElicitationProvider,
   useElicitation,
 } from "@/components/providers/elicitation-provider";
+import { ChatMembersDialog } from "@/components/main/chat/chat-members-dialog";
+import { InviteDialog } from "@/components/main/chat/invite-dialog";
+import { PresenceIndicators } from "@/components/main/chat/presence-indicators";
+import { CollaborationMenu } from "@/components/main/chat/collaboration-menu";
+import { Users, ShieldCheck, MoreHorizontal, X } from "lucide-react";
 
 // =========================================
 // Code-split heavy components (loaded on demand)
@@ -357,6 +363,7 @@ function ChatPageInner() {
   const params = useParams();
   const chatId = params.id as string;
   const searchParams = useSearchParams();
+  const { userId: currentUserId } = useAuthStatusContext();
   const initialQuery = searchParams.get("q") ?? "";
   const initialWebSearch = searchParams.get("web") === "1";
 
@@ -364,6 +371,9 @@ function ChatPageInner() {
   const [webSearch, setWebSearch] = React.useState(initialWebSearch);
   const [memoryDialogOpen, setMemoryDialogOpen] = React.useState(false);
   const [currentModel, setCurrentModel] = React.useState("gpt-4.1-mini");
+  const [membersDialogOpen, setMembersDialogOpen] = React.useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false);
+  const [collabMenuOpen, setCollabMenuOpen] = React.useState(false);
 
   const {
     activeElicitation,
@@ -502,6 +512,15 @@ function ChatPageInner() {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
+      {/* Floating collaboration menu button */}
+      <div className="fixed top-4 right-4 z-50">
+        <CollaborationMenu
+          chatId={chatId}
+          onMembersOpen={() => setMembersDialogOpen(true)}
+          onInviteOpen={() => setInviteDialogOpen(true)}
+        />
+      </div>
+
       <div className="relative flex flex-col flex-1 min-w-0 overflow-hidden">
         <VirtualizedMessageList
           messages={messages}
@@ -538,6 +557,27 @@ function ChatPageInner() {
           elicitation={activeElicitation}
           onClose={() => setActiveElicitation(null)}
         />
+
+        {/* Collaboration dialogs */}
+        {currentUserId && (
+          <>
+            <ChatMembersDialog
+              chatId={chatId}
+              currentUserId={currentUserId}
+              isOpen={membersDialogOpen}
+              onClose={() => setMembersDialogOpen(false)}
+              onInvite={() => {
+                setMembersDialogOpen(false);
+                setInviteDialogOpen(true);
+              }}
+            />
+            <InviteDialog
+              chatId={chatId}
+              isOpen={inviteDialogOpen}
+              onClose={() => setInviteDialogOpen(false)}
+            />
+          </>
+        )}
       </div>
 
       <SplitPanel />

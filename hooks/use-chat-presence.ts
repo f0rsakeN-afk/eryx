@@ -10,13 +10,15 @@ export function useChatPresence(chatId: string | undefined) {
   const [localPresence, setLocalPresence] = useState<Set<string>>(new Set());
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch active users
+  // Fetch active users with better staleness
   const { data: activeUsers = [], refetch } = useQuery({
     queryKey: ["chat", chatId, "presence"],
     queryFn: () => getActiveUsers(chatId!),
     enabled: !!chatId,
-    staleTime: 10000, // 10 seconds
-    refetchInterval: 15000, // Check every 15 seconds
+    staleTime: 5000, // 5 seconds - presence needs to be fresh
+    gcTime: 2 * 60 * 1000, // Keep in cache for 2 minutes
+    refetchInterval: 10000, // Check every 10 seconds for faster updates
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   // Update presence heartbeat
