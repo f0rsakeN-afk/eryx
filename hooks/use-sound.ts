@@ -1,83 +1,122 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getAudioContext, decodeAudioData } from "@/lib/sound-engine";
+import type {
+  SoundAsset,
+  UseSoundOptions,
+  UseSoundReturn,
+} from "@/lib/sound-types";
 
-export function useSound() {
-  const audioContextRef = useRef<AudioContext | null>(null);
+export function useSound(
+  sound: SoundAsset,
+  options: UseSoundOptions = {}
+): UseSoundReturn {
+  const {
+    volume = 1,
+    playbackRate = 1,
+    interrupt = false,
+    soundEnabled = true,
+    onPlay,
+    onEnd,
+    onPause,
+    onStop,
+  } = options;
 
-  const playClick = useCallback(() => {
-    try {
-      // Check if user prefers reduced motion or sound is muted
-      if (
-        typeof window !== "undefined" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ) {
-        return;
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState<number | null>(
+    sound.duration ?? null
+  );
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const bufferRef = useRef<AudioBuffer | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    decodeAudioData(sound.dataUri).then((buffer) => {
+      if (!cancelled) {
+        bufferRef.current = buffer;
+        setDuration(buffer.duration);
       }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sound.dataUri]);
 
-      // Lazy init AudioContext
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
+  const stop = useCallback(() => {
+    if (sourceRef.current) {
+      try {
+        sourceRef.current.stop();
+      } catch {
+        // Already stopped
       }
-
-      const ctx = audioContextRef.current;
-
-      // Create a short click/snap sound
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(800, ctx.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.05);
-
-      gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
-
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.05);
-    } catch {
-      // Silently fail if audio doesn't work
+      sourceRef.current = null;
     }
+    setIsPlaying(false);
+    onStop?.();
+  }, [onStop]);
+
+  const play = useCallback(
+    (overrides?: { volume?: number; playbackRate?: number }) => {
+      if (!soundEnabled || !bufferRef.current) return;
+
+      const ctx = getAudioContext();
+
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+
+      if (interrupt && sourceRef.current) {
+        stop();
+      }
+
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+
+      source.buffer = bufferRef.current;
+      source.playbackRate.value = overrides?.playbackRate ?? playbackRate;
+      gain.gain.value = overrides?.volume ?? volume;
+
+      source.connect(gain);
+      gain.connect(ctx.destination);
+
+      source.onended = () => {
+        setIsPlaying(false);
+        onEnd?.();
+      };
+
+      source.start(0);
+      sourceRef.current = source;
+      gainRef.current = gain;
+      setIsPlaying(true);
+      onPlay?.();
+    },
+    [soundEnabled, playbackRate, volume, interrupt, stop, onPlay, onEnd]
+  );
+
+  const pause = useCallback(() => {
+    stop();
+    onPause?.();
+  }, [stop, onPause]);
+
+  useEffect(() => {
+    if (gainRef.current) {
+      gainRef.current.gain.value = volume;
+    }
+  }, [volume]);
+
+  useEffect(() => {
+    return () => {
+      if (sourceRef.current) {
+        try {
+          sourceRef.current.stop();
+        } catch {
+          // Already stopped
+        }
+      }
+    };
   }, []);
 
-  const playSelect = useCallback(() => {
-    try {
-      if (
-        typeof window !== "undefined" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ) {
-        return;
-      }
-
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-      }
-
-      const ctx = audioContextRef.current;
-
-      // Create a soft "pop" sound for selection
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(600, ctx.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.08);
-
-      gainNode.gain.setValueAtTime(0.08, ctx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-
-      oscillator.start(ctx.currentTime);
-      oscillator.stop(ctx.currentTime + 0.1);
-    } catch {
-      // Silently fail
-    }
-  }, []);
-
-  return { playClick, playSelect };
+  return [play, { stop, pause, isPlaying, duration, sound }] as const;
 }

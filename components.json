@@ -27,6 +27,7 @@
     "@spectrumui": "https://ui.spectrumhq.in/r/{name}.json",
     "@odysseyui": "https://www.odysseyui.com/r/{name}.json",
     "@unlumen-ui": "https://ui.unlumen.com/r/{name}.json",
-    "@animate-ui": "https://animate-ui.com/r/{name}.json"
+    "@animate-ui": "https://animate-ui.com/r/{name}.json",
+    "@soundcn": "https://soundcn.xyz/r/{name}.json"
   }
 }

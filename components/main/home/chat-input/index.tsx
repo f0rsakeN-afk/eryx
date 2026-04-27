@@ -14,7 +14,6 @@ import { ModelSelector } from "./model-selector";
 import { useServers } from "@/hooks/use-mcp-servers";
 import { useUser } from "@stackframe/stack";
 import { useChatSuggestions } from "@/hooks/use-chat-suggestions";
-import { useSound } from "@/hooks/use-sound";
 import { motion, AnimatePresence } from "motion/react";
 import type { Attachment, ChatInputProps } from "@/types/chat-input";
 //import { Textarea } from "@/components/ui/textarea";
@@ -85,14 +84,11 @@ export const ChatInput = React.memo(function ChatInput({
     enabled: suggestionsEnabled,
   });
 
-  const { playSelect } = useSound();
-
   const handleSuggestionClick = useCallback(
     (suggestion: string) => {
-      playSelect();
       handleSelectFromHook(suggestion);
     },
-    [playSelect, handleSelectFromHook],
+    [handleSelectFromHook],
   );
 
   const isEmpty = !value.trim() && files.length === 0;
