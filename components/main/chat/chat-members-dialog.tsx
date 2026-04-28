@@ -90,6 +90,7 @@ interface MemberRowProps {
   isUpdating: boolean;
   isRemoving: boolean;
   isTransferring: boolean;
+  showDetails: boolean; // If false, hide email and role (for VIEWERs)
   onRoleChange: (role: "EDITOR" | "VIEWER") => void;
   onRemove: () => void;
   onTransferOwnership: () => void;
@@ -101,6 +102,7 @@ const MemberRow = React.memo(function MemberRow({
   isCurrentUser,
   canManage,
   isOwner,
+  showDetails,
   isUpdating,
   isRemoving,
   isTransferring,
@@ -126,7 +128,7 @@ const MemberRow = React.memo(function MemberRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium truncate">
-            {isCurrentUser ? "You" : member.user.email?.split("@")[0]}
+            {isCurrentUser ? "You" : showDetails ? member.user.email?.split("@")[0] : "Member"}
           </p>
           {isCurrentUser && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
@@ -134,18 +136,20 @@ const MemberRow = React.memo(function MemberRow({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <Badge variant="outline" className={cn("text-xs gap-1.5 py-0", config.badgeClass)}>
-            <RoleIcon className={cn("h-3 w-3", config.iconClass)} />
-            {config.label}
-          </Badge>
-          {isActive && (
-            <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              Active
-            </span>
-          )}
-        </div>
+        {showDetails && (
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="outline" className={cn("text-xs gap-1.5 py-0", config.badgeClass)}>
+              <RoleIcon className={cn("h-3 w-3", config.iconClass)} />
+              {config.label}
+            </Badge>
+            {isActive && (
+              <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                Active
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {canManage && (
@@ -247,7 +251,10 @@ export function ChatMembersDialog({
     [members, currentUserId]
   );
   const isCurrentUserOwner = currentMember?.role === "OWNER";
+  const isCurrentUserEditor = currentMember?.role === "EDITOR";
   const isCurrentUserMember = !!currentMember;
+  // Show full member details (email, role) only to OWNERs and EDITORs
+  const showMemberDetails = isCurrentUserOwner || isCurrentUserEditor;
 
   const loadInvitations = useCallback(async () => {
     if (!chatId) return;
@@ -347,13 +354,14 @@ export function ChatMembersDialog({
           isUpdating={isUpdating}
           isRemoving={isRemoving}
           isTransferring={transferringTo === member.userId}
+          showDetails={showMemberDetails}
           onRoleChange={(role) => handleRoleChange(member.userId, role)}
           onRemove={() => handleRemoveRequest(member.userId)}
           onTransferOwnership={() => handleTransferOwnership(member.userId)}
         />
       );
     });
-  }, [members, activeUserIds, currentUserId, isCurrentUserOwner, isUpdating, isRemoving, transferringTo, handleRoleChange, handleRemoveRequest, handleTransferOwnership]);
+  }, [members, activeUserIds, currentUserId, isCurrentUserOwner, showMemberDetails, isUpdating, isRemoving, transferringTo, handleRoleChange, handleRemoveRequest, handleTransferOwnership]);
 
   return (
     <>

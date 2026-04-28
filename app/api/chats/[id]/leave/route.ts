@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import redis, { KEYS } from "@/lib/redis";
 import { validateAuth, AccountDeactivatedError } from "@/lib/auth";
 import {
   requireChatAccess,
@@ -72,6 +73,13 @@ export async function POST(
       invalidateMemberCache(chatId),
       invalidateRoleCache(chatId, user.id),
     ]);
+
+    // Clean up presence data immediately
+    try {
+      await redis.hdel(KEYS.chatPresence(chatId), user.id);
+    } catch {
+      // Redis error, presence will expire naturally via TTL
+    }
 
     // Publish member removed event for real-time collaboration updates
     await publishMemberRemoved(chatId, user.id);

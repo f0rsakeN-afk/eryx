@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import redis, { KEYS } from "@/lib/redis";
+import redis, { KEYS, CHANNELS } from "@/lib/redis";
 import { validateAuth, AccountDeactivatedError } from "@/lib/auth";
 import { requireChatAccess, invalidateMemberCache, generateInviteToken } from "@/lib/chat-access";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
@@ -53,6 +53,7 @@ export async function POST(
     // Use transaction for atomicity
     const invitation = await prisma.$transaction(async (tx) => {
       // If email provided, check if user already a member
+      let inviteeUserId = null;
       if (email) {
         const existingUser = await tx.user.findUnique({
           where: { email },
@@ -67,6 +68,7 @@ export async function POST(
           if (existingMember) {
             throw new Error("USER_ALREADY_MEMBER");
           }
+          inviteeUserId = existingUser.id;
         }
 
         // Check for existing pending invitation (idempotency)
@@ -84,8 +86,14 @@ export async function POST(
         }
       }
 
+      // Get chat title for notification
+      const chat = await tx.chat.findUnique({
+        where: { id: chatId },
+        select: { title: true, userId: true },
+      });
+
       // Create invitation with secure token
-      return tx.chatInvitation.create({
+      const newInvitation = await tx.chatInvitation.create({
         data: {
           chatId,
           email: email || null,
@@ -95,6 +103,21 @@ export async function POST(
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         },
       });
+
+      // Create notification for existing users
+      if (inviteeUserId && chat) {
+        await tx.notification.create({
+          data: {
+            userId: inviteeUserId,
+            title: "Chat Invitation",
+            description: `You've been invited to join "${chat.title}" as ${role}`,
+            accent: "bg-primary",
+            invitationToken: newInvitation.token,
+          },
+        });
+      }
+
+      return newInvitation;
     }, {
       maxWait: 5000, // Wait up to 5s for transaction
       timeout: 10000, // Transaction timeout
@@ -108,6 +131,24 @@ export async function POST(
       await redis.del(`chat:${chatId}:invitations`);
     } catch {
       // Redis unavailable
+    }
+
+    // Publish notification to the invitee's stream if it's an existing user
+    if (email) {
+      const invitee = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (invitee) {
+        try {
+          await redis.publish(
+            CHANNELS.notifications(invitee.id),
+            JSON.stringify({ type: "notification:created", timestamp: new Date().toISOString() })
+          );
+        } catch {
+          // Redis publish error, ignore
+        }
+      }
     }
 
     const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite/${invitation.token}`;

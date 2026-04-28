@@ -24,6 +24,7 @@ import { ChatMembersDialog } from "@/components/main/chat/chat-members-dialog";
 import { InviteDialog } from "@/components/main/chat/invite-dialog";
 import { PresenceIndicators } from "@/components/main/chat/presence-indicators";
 import { CollaborationMenu } from "@/components/main/chat/collaboration-menu";
+import { useChatMembers } from "@/hooks/use-chat-members";
 import { Users, ShieldCheck, MoreHorizontal, X } from "lucide-react";
 
 // =========================================
@@ -382,6 +383,10 @@ function ChatPageInner() {
     addDismissedId,
   } = useElicitation();
 
+  const { members } = useChatMembers(chatId);
+  const currentMember = members.find((m) => m.userId === currentUserId);
+  const isViewer = currentMember?.role === "VIEWER";
+
   const {
     messages,
     isLoading,
@@ -546,7 +551,7 @@ function ChatPageInner() {
               value={input}
               onChange={setInput}
               onSubmit={handleSubmit}
-              placeholder="Ask a follow-up…"
+              placeholder={isViewer ? "You have view-only access" : "Ask a follow-up…"}
               onOpenMemory={() => setMemoryDialogOpen(true)}
               webSearchEnabled={webSearch}
               onWebSearchToggle={(enabled) => setWebSearch(enabled)}
@@ -554,6 +559,7 @@ function ChatPageInner() {
               currentModel={currentModel}
               onModelChange={(model) => setCurrentModel(model)}
               isLoading={isStreaming}
+              disabled={isViewer}
             />
           </div>
         </div>

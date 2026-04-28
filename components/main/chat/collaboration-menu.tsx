@@ -88,7 +88,9 @@ function ActiveMembersRow({
 export function CollaborationMenu({ chatId, onInviteOpen, onMembersOpen }: CollaborationMenuProps) {
   const { userId: currentUserId } = useAuthStatusContext();
   const { members } = useChatMembers(chatId);
-  const { activeUsers } = useChatPresence(chatId);
+  // Only check presence if there are other members (besides owner)
+  const hasOtherMembers = members.length > 1;
+  const { activeUsers } = useChatPresence(hasOtherMembers ? chatId : undefined);
   const [open, setOpen] = React.useState(false);
 
   const currentUserRole = React.useMemo(() => {

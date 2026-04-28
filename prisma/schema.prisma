@@ -141,6 +141,7 @@ model ChatMember {
   @@unique([chatId, userId])
   @@index([chatId])
   @@index([userId])
+  @@index([userId, chatId]) // For queries filtering by userId only
 }
 
 model ChatInvitation {
@@ -159,6 +160,7 @@ model ChatInvitation {
   @@index([chatId])
   @@index([email])
   @@index([token])
+  @@index([chatId, status, expiresAt]) // For fetching pending invitations by chat
 }
 
 enum SENDER {
@@ -481,14 +483,15 @@ model OnboardingData {
 }
 
 model Notification {
-  id           String    @id @default(cuid())
-  userId       String
-  title        String
-  description  String
-  read         Boolean   @default(false)
-  archived     Boolean   @default(false)
-  snoozedUntil DateTime?
-  accent       String    @default("bg-blue-400") // CSS color class
+  id              String    @id @default(cuid())
+  userId          String
+  title           String
+  description     String
+  read            Boolean   @default(false)
+  archived        Boolean   @default(false)
+  snoozedUntil    DateTime?
+  accent          String    @default("bg-blue-400") // CSS color class
+  invitationToken String? // Token for invitation-type notifications
 
   createdAt DateTime @default(now())
 

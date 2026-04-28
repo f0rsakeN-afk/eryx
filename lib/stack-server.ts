@@ -440,9 +440,13 @@ export async function deleteChat(chatId: string, userId: string) {
     throw new Error("Chat not found");
   }
 
-  // Clear cache
-  await redis.del(KEYS.chatMessages(chatId));
-  await redis.del(KEYS.chatMeta(chatId));
+  // Clear all chat-related caches
+  await Promise.all([
+    redis.del(KEYS.chatMessages(chatId)),
+    redis.del(KEYS.chatMeta(chatId)),
+    redis.del(KEYS.chatPresence(chatId)),
+    redis.del(KEYS.chatTyping(chatId)),
+  ]);
 
   // Invalidate user chat list cache
   try {
@@ -451,15 +455,7 @@ export async function deleteChat(chatId: string, userId: string) {
   } catch {
     // Redis error, ignore
   }
-
-  // Publish sidebar event
-  await redis.publish(
-    CHANNELS.sidebar(userId),
-    JSON.stringify({
-      type: "chat:deleted",
-      chatId,
-    })
-  );
+  // Note: sidebar publish is now handled by the caller via publishChatDeleted
 }
 
 export async function getChatMessages(

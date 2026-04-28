@@ -173,18 +173,19 @@ export async function publishChatArchived(
 }
 
 /**
- * Notify chat was deleted
+ * Notify chat was deleted - publishes to all member's sidebar channels
  */
 export async function publishChatDeleted(
   chatId: string,
-  userId: string
+  memberIds: string[]
 ): Promise<void> {
   const event: ChatDeletedEvent = {
     type: "chat:deleted",
     chatId,
   };
 
-  await publishToSidebar(userId, event);
+  // Publish to all members' sidebar channels
+  await Promise.all(memberIds.map((memberId) => publishToSidebar(memberId, event)));
 }
 
 /**
@@ -250,7 +251,11 @@ export async function publishMemberAdded(
     memberId,
   };
 
-  await publishToChat(chatId, event);
+  // Publish to chat channel (for other members) and to member's sidebar (for the new member)
+  await Promise.all([
+    publishToChat(chatId, event),
+    publishToSidebar(memberId, event),
+  ]);
 }
 
 /**
@@ -266,7 +271,11 @@ export async function publishMemberRemoved(
     memberId,
   };
 
-  await publishToChat(chatId, event);
+  // Publish to chat channel (for remaining members) and to removed member's sidebar
+  await Promise.all([
+    publishToChat(chatId, event),
+    publishToSidebar(memberId, event),
+  ]);
 }
 
 /**
@@ -284,5 +293,9 @@ export async function publishMemberRoleChanged(
     newRole,
   };
 
-  await publishToChat(chatId, event);
+  // Publish to chat channel (for other members) and to affected member's sidebar
+  await Promise.all([
+    publishToChat(chatId, event),
+    publishToSidebar(memberId, event),
+  ]);
 }

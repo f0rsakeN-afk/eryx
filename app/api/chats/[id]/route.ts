@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 import { getChatById, updateChat, deleteChat } from "@/lib/stack-server";
 import { validateAuth } from "@/lib/auth";
 import { requireChatAccess, getChatRole, PERMISSIONS } from "@/lib/chat-access";
@@ -111,10 +112,17 @@ export async function DELETE(
     // Check access - need OWNER to delete
     await requireChatAccess(user.id, id, "OWNER");
 
+    // Get all member IDs for notification (owner + all members)
+    const members = await prisma.chatMember.findMany({
+      where: { chatId: id },
+      select: { userId: true },
+    });
+    const memberIds = [user.id, ...members.map((m) => m.userId)];
+
     await deleteChat(id, user.id);
 
-    // Publish delete event for real-time sync
-    await publishChatDeleted(id, user.id);
+    // Publish delete event for real-time sync to all members
+    await publishChatDeleted(id, memberIds);
 
     return NextResponse.json({ success: true });
   } catch (error) {

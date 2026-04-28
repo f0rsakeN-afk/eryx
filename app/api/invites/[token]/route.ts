@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import redis, { KEYS, CHANNELS } from "@/lib/redis";
 import { validateAuth, AccountDeactivatedError } from "@/lib/auth";
 import { invalidateMemberCache, invalidateRoleCache } from "@/lib/chat-access";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
@@ -185,7 +186,7 @@ export async function POST(
       }, {
         maxWait: 5000,
         timeout: 10000,
-        isolationLevel: "Serializable", // Strongest isolation to prevent race conditions
+        // Default isolation is sufficient - status check handles concurrent accepts
       });
     } catch (txError) {
       // Handle known error cases
@@ -218,6 +219,9 @@ export async function POST(
 
     // Publish member added event for real-time collaboration updates
     await publishMemberAdded(newMember.chatId, newMember.userId);
+
+    // Archive the related notification
+    await archiveInvitationNotification(user.id, newMember.chatId, token);
 
     return NextResponse.json({
       success: true,
@@ -282,6 +286,9 @@ export async function DELETE(
       data: { status: "declined" },
     });
 
+    // Archive the related notification
+    await archiveInvitationNotification(user.id, invitation.chatId, invitation.token);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof AccountDeactivatedError) {
@@ -289,5 +296,62 @@ export async function DELETE(
     }
     console.error("Decline invitation error:", error);
     return NextResponse.json({ error: "Failed to decline invitation" }, { status: 500 });
+  }
+}
+
+/**
+ * Archive notification for invitation (match by invitation token or chat title as fallback)
+ */
+async function archiveInvitationNotification(userId: string, chatId: string, token: string): Promise<void> {
+  try {
+    // Get chat title for fallback matching
+    const chat = await prisma.chat.findUnique({
+      where: { id: chatId },
+      select: { title: true },
+    });
+
+    // Find and archive the notification by token
+    let archived = await prisma.notification.updateMany({
+      where: {
+        userId,
+        invitationToken: token,
+        archived: false,
+      },
+      data: { archived: true },
+    });
+
+    // Fallback: also archive notifications matching by chat title (for old notifications without token)
+    if (archived.count === 0 && chat) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      await prisma.notification.updateMany({
+        where: {
+          userId,
+          title: "Chat Invitation",
+          description: { contains: chat.title },
+          archived: false,
+          createdAt: { gt: sevenDaysAgo },
+        },
+        data: { archived: true },
+      });
+    }
+
+    // Invalidate notifications cache
+    try {
+      await redis.del(KEYS.userNotifications(userId));
+    } catch {
+      // Redis unavailable
+    }
+
+    // Publish update to user's notification stream
+    try {
+      await redis.publish(
+        CHANNELS.notifications(userId),
+        JSON.stringify({ type: "notifications:bulk", action: "read-all", timestamp: new Date().toISOString() })
+      );
+    } catch {
+      // Redis publish error
+    }
+  } catch {
+    // Non-critical, ignore errors
   }
 }
