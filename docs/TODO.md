@@ -21,6 +21,9 @@ This document tracks planned improvements, optimizations, and technical debt for
 - [x] ZIP uploaded to S3 with presigned URL
 - [x] `GET /api/settings/export?jobId=xxx` returns status and download URL
 - [x] Download via S3 presigned URL (24hr expiry)
+- [x] Email notification when export completes (with download link)
+- [x] Email notification when export fails
+- [x] Spam prevention: 1-hour cooldown between exports
 
 **Files Created/Modified:**
 - `prisma/schema.prisma` - Added `ExportJob` model and `ExportStatus` enum
@@ -28,6 +31,7 @@ This document tracks planned improvements, optimizations, and technical debt for
 - `services/export.service.ts` - New service for export job processing
 - `services/queue.service.ts` - Added EXPORT queue
 - `services/workers.ts` - Added export worker
+- `services/email.service.ts` - Added `export-complete` and `export-failed` templates
 
 **S3 Cost Estimate (1000 users/month):**
 - Storage (10GB): ~$0.23/mo

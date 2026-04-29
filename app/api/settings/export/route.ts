@@ -2,6 +2,10 @@
  * Settings - Export User Data
  * POST /api/settings/export - Start async export job
  * GET /api/settings/export - Get export job status and download URL
+ *
+ * Spam prevention:
+ * - Only one pending/processing export at a time
+ * - Cooldown of 1 hour between exports
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,6 +17,8 @@ import {
   getExportJobStatus,
   getExportDownloadUrl,
 } from "@/services/export.service";
+
+const EXPORT_COOLDOWN_HOURS = 1;
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,13 +54,39 @@ export async function POST(request: NextRequest) {
       }, { status: 409 });
     }
 
+    // Check cooldown - prevent spam (only one export per hour)
+    const oneHourAgo = new Date();
+    oneHourAgo.setHours(oneHourAgo.getHours() - EXPORT_COOLDOWN_HOURS);
+
+    const recentExport = await prisma.exportJob.findFirst({
+      where: {
+        userId: prismaUser.id,
+        createdAt: { gte: oneHourAgo },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (recentExport) {
+      const cooldownEnds = new Date(recentExport.createdAt);
+      cooldownEnds.setHours(cooldownEnds.getHours() + EXPORT_COOLDOWN_HOURS);
+      const minutesRemaining = Math.ceil((cooldownEnds.getTime() - Date.now()) / 60000);
+
+      return NextResponse.json({
+        error: "Export cooldown active",
+        code: "EXPORT_COOLDOWN",
+        message: `Please wait ${minutesRemaining} minutes before requesting another export.`,
+        cooldownEndsAt: cooldownEnds.toISOString(),
+        minutesRemaining,
+      }, { status: 429 });
+    }
+
     // Create and queue export job
     const jobId = await createExportJob(prismaUser.id);
 
     return NextResponse.json({
       status: "processing",
       jobId,
-      message: "Export job started. Use GET /api/settings/export?jobId=xxx to check status.",
+      message: "Export job started. You'll receive an email when it's ready.",
     }, { status: 202 });
   } catch (error) {
     console.error("Export error:", error);

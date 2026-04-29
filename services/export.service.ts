@@ -28,6 +28,14 @@ export async function processExportJob(data: ExportJobData): Promise<void> {
     data: { status: "PROCESSING" },
   });
 
+  // Get user for email
+  const prismaUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, customize: { select: { name: true } } },
+  });
+
+  const userName = prismaUser?.customize?.name || prismaUser?.email?.split("@")[0] || "there";
+
   try {
     // Fetch all user data
     const prismaUser = await prisma.user.findUnique({
@@ -229,6 +237,18 @@ This export contains all your Eryx account data.`);
       },
     });
 
+    // Send completion email with download link
+    if (prismaUser?.email) {
+      const { getPresignedDownloadUrl } = await import("@/services/s3.service");
+      const downloadUrl = await getPresignedDownloadUrl(s3Key);
+
+      const { sendEmail } = await import("@/services/email.service");
+      await sendEmail(prismaUser.email, "export-complete", {
+        name: userName,
+        downloadUrl: downloadUrl || `${process.env.NEXT_PUBLIC_APP_URL}/settings?export=${exportJobId}`,
+      });
+    }
+
     console.log(`[Export] Job ${exportJobId} completed, S3 key: ${s3Key}`);
   } catch (error) {
     console.error(`[Export] Job ${exportJobId} failed:`, error);
@@ -241,6 +261,15 @@ This export contains all your Eryx account data.`);
         error: error instanceof Error ? error.message : "Unknown error",
       },
     });
+
+    // Send failure email
+    if (prismaUser?.email) {
+      const { sendEmail } = await import("@/services/email.service");
+      await sendEmail(prismaUser.email, "export-failed", {
+        name: userName,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
 
     throw error;
   }

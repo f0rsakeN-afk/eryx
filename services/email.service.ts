@@ -91,6 +91,40 @@ const TEMPLATES: Record<string, (data: Record<string, unknown>) => EmailTemplate
       <p>If you didn't request this, ignore this email.</p>
     `,
   }),
+
+  "export-complete": (data) => ({
+    subject: "Your data export is ready!",
+    html: `
+      <h1>Data Export Ready!</h1>
+      <p>Hi ${data.name || "there"},</p>
+      <p>Your data export is complete and ready for download.</p>
+      <p><a href="${data.downloadUrl}">Download your data →</a></p>
+      <p>This link expires in 24 hours.</p>
+      <p>The export contains:</p>
+      <ul>
+        <li>Account information</li>
+        <li>Settings and preferences</li>
+        <li>Projects</li>
+        <li>Conversations and messages</li>
+        <li>Feedback and reports</li>
+        <li>MCP server configurations</li>
+      </ul>
+      <p>- The Eryx Team</p>
+    `,
+  }),
+
+  "export-failed": (data) => ({
+    subject: "Data export failed",
+    html: `
+      <h1>Data Export Failed</h1>
+      <p>Hi ${data.name || "there"},</p>
+      <p>Unfortunately, your data export failed.</p>
+      <p>Error: ${data.error || "Unknown error"}</p>
+      <p>Please try again later or contact support if the problem persists.</p>
+      <p><a href="${APP_URL}/settings">Go to Settings →</a></p>
+      <p>- The Eryx Team</p>
+    `,
+  }),
 };
 
 /**
