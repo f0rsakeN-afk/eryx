@@ -7,6 +7,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
+import { notFoundError, internalError, validationError } from "@/lib/api-response";
+import { z } from "zod";
+
+const onboardingSchema = z.object({
+  profession: z.string().max(100).optional(),
+  source: z.string().max(100).optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,7 +64,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { profession, source } = body;
+    const parsed = onboardingSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
+    }
+
+    const { profession, source } = parsed.data;
 
     // Update user's seenOnboarding flag
     await prisma.user.update({

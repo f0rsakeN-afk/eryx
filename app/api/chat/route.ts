@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { JsonToSseTransformStream } from "ai";
 import prisma from "@/lib/prisma";
 import redis, { KEYS, TTL } from "@/lib/redis";
@@ -23,6 +24,16 @@ import { getMCPToolsForChat, formatMCPToolsForOpenAI } from "@/services/mcp-tool
 import { executeMCPToolCalls } from "@/services/mcp-tool-executor.service";
 import { buildProjectContext, buildProjectContextSection, getProjectFilesForContext } from "@/services/project-context.service";
 import { retrieveContext, formatContextForPrompt } from "@/services/rag.service";
+import {
+  unauthorizedError,
+  notFoundError,
+  forbiddenError,
+  badRequestError,
+  internalError,
+  validationError,
+  rateLimitError,
+} from "@/lib/api-response";
+import { createChatStreamSchema, stopChatStreamSchema } from "@/lib/validations";
 
 // Track which chat+stream combinations have been superseded (user sent new message)
 const supersededStreams = new Set<string>();
@@ -457,26 +468,32 @@ export async function POST(req: NextRequest) {
 
     const user = await validateAuth(req);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const body = await req.json().catch(() => ({}));
-    const { messages, chatId, mode, resume, style, model: requestedModel } = body;
+    const parsed = createChatStreamSchema.safeParse(body);
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: "Messages required" }, { status: 400 });
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
     }
 
-    if (!chatId) {
-      return NextResponse.json({ error: "Chat ID required" }, { status: 400 });
-    }
+    const { messages, chatId, mode, resume, model: requestedModel } = parsed.data;
+
+    // Map user style to response style for buildMessages
+    const styleMap: Record<string, ResponseStyle | undefined> = {
+      concise: "concise",
+      balanced: "normal",
+      detailed: "explanatory",
+    };
+    const responseStyle = styleMap[parsed.data.style || "balanced"];
 
     // Verify user has access to this chat (EDITOR or OWNER can trigger AI)
     const { requireChatAccess } = await import("@/lib/chat-access");
     const userRole = await requireChatAccess(user.id, chatId, "EDITOR");
 
     if (!userRole) {
-      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+      return notFoundError("Chat");
     }
 
     const supersededKey = getSupersededKey(chatId, streamVersion);
@@ -565,10 +582,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Build messages
-    let fullMessages = await buildMessages(chatId, messages, undefined, style);
+    let fullMessages = await buildMessages(chatId, messages, undefined, responseStyle);
 
     if (fullMessages.length === 0 || (fullMessages.length === 1 && fullMessages[0].role === "system")) {
-      return NextResponse.json({ error: "No messages available" }, { status: 400 });
+      return badRequestError("No messages available");
     }
 
     // Track state
@@ -661,7 +678,7 @@ export async function POST(req: NextRequest) {
         .then(async (searchResponse) => {
           searchResults = searchResponse.results;
           if (searchResults.length > 0) {
-            fullMessages = await buildMessages(chatId, messages, searchResults, style);
+            fullMessages = await buildMessages(chatId, messages, searchResults, responseStyle);
           }
           searchCompleted = true;
         })
@@ -745,10 +762,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof AccountDeactivatedError) {
-      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+      return forbiddenError("Account deactivated");
     }
     console.error("[chat] Chat API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return internalError("Internal server error");
   }
 }
 
@@ -759,15 +776,17 @@ export async function DELETE(req: NextRequest) {
   try {
     const user = await validateAuth(req);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const body = await req.json().catch(() => ({}));
-    const { chatId } = body;
+    const parsed = stopChatStreamSchema.safeParse(body);
 
-    if (!chatId) {
-      return NextResponse.json({ error: "Chat ID required" }, { status: 400 });
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
     }
+
+    const { chatId } = parsed.data;
 
     // Verify user owns this chat
     const chat = await prisma.chat.findFirst({
@@ -776,7 +795,7 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (!chat) {
-      return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+      return notFoundError("Chat");
     }
 
     // Stop the resumable stream
@@ -785,7 +804,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[chat] Stop stream error:", error);
-    return NextResponse.json({ error: "Failed to stop stream" }, { status: 500 });
+    return internalError("Failed to stop stream");
   }
 }
 

@@ -6,11 +6,24 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getOrCreateUser, AccountDeactivatedError } from "@/lib/auth";
 import { getUserLimits } from "@/services/limit.service";
 import redis, { KEYS, TTL } from "@/lib/redis";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import {
+  unauthorizedError,
+  notFoundError,
+  badRequestError,
+  forbiddenError,
+  internalError,
+  validationError,
+} from "@/lib/api-response";
+import {
+  createProjectSchema,
+  projectQuerySchema,
+} from "@/lib/validations";
 
 interface ProjectCache {
   projects: Array<{
@@ -35,7 +48,14 @@ export async function GET(request: NextRequest) {
     const user = await getOrCreateUser(request);
 
     const { searchParams } = new URL(request.url);
-    const archived = searchParams.get("archived");
+    const queryParams = Object.fromEntries(searchParams);
+    const parsed = projectQuerySchema.safeParse(queryParams);
+
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
+    }
+
+    const { archived } = parsed.data;
     const showArchived = archived === "true";
 
     // Try cache for non-archived requests only
@@ -96,16 +116,10 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     if (error instanceof AccountDeactivatedError) {
-      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
-    }
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return forbiddenError("Account deactivated");
     }
     console.error("Error fetching projects:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch projects" },
-      { status: 500 }
-    );
+    return internalError("Failed to fetch projects");
   }
 }
 
@@ -115,14 +129,13 @@ export async function POST(request: NextRequest) {
     const user = await getOrCreateUser(request);
 
     const body = await request.json();
-    const { name, description, instruction } = body;
+    const parsed = createProjectSchema.safeParse(body);
 
-    if (!name || name.length < 2 || name.length > 50) {
-      return NextResponse.json(
-        { error: "Project name must be 2-50 characters" },
-        { status: 400 }
-      );
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
     }
+
+    const { name, description, instruction } = parsed.data;
 
     // Check project limit
     const limits = await getUserLimits(user.id);
@@ -173,16 +186,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     if (error instanceof AccountDeactivatedError) {
-      return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
-    }
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return forbiddenError("Account deactivated");
     }
     console.error("Error creating project:", error);
-    return NextResponse.json(
-      { error: "Failed to create project" },
-      { status: 500 }
-    );
+    return internalError("Failed to create project");
   }
 }
 

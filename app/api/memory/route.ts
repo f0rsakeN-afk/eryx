@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { validateAuth } from "@/lib/auth";
 import {
   getMemories,
   searchMemories,
   addMemory,
   deleteMemory,
-  getMemoryCategories,
 } from "@/services/memory.service";
 import { checkMemoryLimit, getUserLimits } from "@/services/limit.service";
 import { createMemoryEmbeddings, deleteMemoryEmbeddings } from "@/lib/stack-server";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import prisma from "@/lib/prisma";
+import {
+  unauthorizedError,
+  notFoundError,
+  badRequestError,
+  forbiddenError,
+  internalError,
+  validationError,
+} from "@/lib/api-response";
+import {
+  memoryQuerySchema,
+  createMemorySchema,
+  updateMemorySchema,
+  memoryIdSchema,
+} from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,15 +34,20 @@ export async function GET(request: NextRequest) {
 
     const user = await validateAuth(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get("q") || "";
-    const category = searchParams.get("category") || undefined;
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
+    const queryParams = Object.fromEntries(searchParams);
+    const parsed = memoryQuerySchema.safeParse(queryParams);
 
-    if (query.trim()) {
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
+    }
+
+    const { q: query, category, limit } = parsed.data;
+
+    if (query?.trim()) {
       const result = await searchMemories(user.id, query, { limit, category });
       return NextResponse.json(result);
     }
@@ -38,7 +56,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Memory GET error:", error);
-    return NextResponse.json({ error: "Failed to fetch memories" }, { status: 500 });
+    return internalError("Failed to fetch memories");
   }
 }
 
@@ -51,14 +69,14 @@ export async function POST(request: NextRequest) {
 
     const user = await validateAuth(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const body = await request.json();
-    const { title, content, tags, category, metadata } = body;
+    const parsed = createMemorySchema.safeParse(body);
 
-    if (!content || typeof content !== "string") {
-      return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
     }
 
     // Check memory limit
@@ -68,15 +86,8 @@ export async function POST(request: NextRequest) {
 
       // If feature not available at all
       if (limits.maxMemoryItems === 0) {
-        return NextResponse.json(
-          {
-            error: "Memory feature not available",
-            code: "MEMORY_NOT_AVAILABLE",
-            message: "Upgrade to a paid plan to unlock long-term memory for your AI conversations.",
-            action: "upgrade",
-            upgradeTo: "Basic",
-          },
-          { status: 403 }
+        return forbiddenError(
+          "Memory feature not available. Upgrade to a paid plan to unlock long-term memory for your AI conversations."
         );
       }
 
@@ -97,6 +108,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { title, content, tags, category, metadata } = parsed.data;
+
     const memory = await addMemory(user.id, {
       title: title || content.slice(0, 100),
       content,
@@ -111,7 +124,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(memory);
   } catch (error) {
     console.error("Memory POST error:", error);
-    return NextResponse.json({ error: "Failed to add memory" }, { status: 500 });
+    return internalError("Failed to add memory");
   }
 }
 
@@ -119,33 +132,36 @@ export async function PUT(request: NextRequest) {
   try {
     const user = await validateAuth(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const { searchParams } = new URL(request.url);
-    const memoryId = searchParams.get("id");
+    const idParams = Object.fromEntries(searchParams);
+    const idParsed = memoryIdSchema.safeParse(idParams);
 
-    if (!memoryId) {
-      return NextResponse.json({ error: "Memory ID required" }, { status: 400 });
+    if (!idParsed.success) {
+      return badRequestError("Memory ID is required");
     }
 
     const body = await request.json();
-    const { title, content, tags, category, metadata } = body;
+    const parsed = updateMemorySchema.safeParse(body);
+
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
+    }
 
     const { updateMemory } = await import("@/services/memory.service");
 
-    const memory = await updateMemory(memoryId, user.id, {
-      title,
-      content,
-      tags,
-      category,
-      metadata,
-    });
+    const memory = await updateMemory(idParsed.data.id, user.id, parsed.data);
+
+    if (!memory) {
+      return notFoundError("Memory");
+    }
 
     return NextResponse.json(memory);
   } catch (error) {
     console.error("Memory PUT error:", error);
-    return NextResponse.json({ error: "Failed to update memory" }, { status: 500 });
+    return internalError("Failed to update memory");
   }
 }
 
@@ -153,23 +169,24 @@ export async function DELETE(request: NextRequest) {
   try {
     const user = await validateAuth(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const { searchParams } = new URL(request.url);
-    const memoryId = searchParams.get("id");
+    const idParams = Object.fromEntries(searchParams);
+    const idParsed = memoryIdSchema.safeParse(idParams);
 
-    if (!memoryId) {
-      return NextResponse.json({ error: "Memory ID required" }, { status: 400 });
+    if (!idParsed.success) {
+      return badRequestError("Memory ID is required");
     }
 
     // Delete embeddings first
-    await deleteMemoryEmbeddings(memoryId);
+    await deleteMemoryEmbeddings(idParsed.data.id);
 
-    await deleteMemory(memoryId, user.id);
+    await deleteMemory(idParsed.data.id, user.id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Memory DELETE error:", error);
-    return NextResponse.json({ error: "Failed to delete memory" }, { status: 500 });
+    return internalError("Failed to delete memory");
   }
 }

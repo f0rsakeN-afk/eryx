@@ -6,10 +6,23 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getOrCreateUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import redis, { KEYS, TTL, CHANNELS } from "@/lib/redis";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import {
+  notFoundError,
+  badRequestError,
+  internalError,
+  validationError,
+} from "@/lib/api-response";
+import {
+  notificationQuerySchema,
+  notificationPrefsSchema,
+  notificationActionSchema,
+  notificationBulkActionSchema,
+} from "@/lib/validations/api.validation";
 
 interface NotificationsCache {
   notifications: Array<{
@@ -42,7 +55,14 @@ export async function GET(request: NextRequest) {
     const user = await getOrCreateUser(request);
 
     const { searchParams } = new URL(request.url);
-    const filter = searchParams.get("filter") || "all";
+    const queryParams = Object.fromEntries(searchParams);
+    const parsed = notificationQuerySchema.safeParse(queryParams);
+
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
+    }
+
+    const { filter } = parsed.data;
     const now = new Date();
 
     // For "all" filter, try cache first
@@ -143,65 +163,64 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
-    // Handle preference updates (partial update - only update fields provided)
+    // Handle preference updates
     if (body.prefs !== undefined) {
-      const updateData: Record<string, unknown> = {};
-      if (body.prefs.newFeature !== undefined) updateData.newFeature = body.prefs.newFeature;
-      if (body.prefs.credits !== undefined) updateData.credits = body.prefs.credits;
-      if (body.prefs.system !== undefined) updateData.system = body.prefs.system;
-      if (body.prefs.tips !== undefined) updateData.tips = body.prefs.tips;
-      if (body.prefs.security !== undefined) updateData.security = body.prefs.security;
+      const parsed = notificationPrefsSchema.safeParse(body.prefs);
+      if (!parsed.success) {
+        return validationError(parsed.error.issues);
+      }
 
       const prefs = await prisma.notificationPrefs.upsert({
         where: { userId: user.id },
         create: {
           userId: user.id,
-          newFeature: body.prefs.newFeature ?? true,
-          credits: body.prefs.credits ?? true,
-          system: body.prefs.system ?? false,
-          tips: body.prefs.tips ?? true,
-          security: body.prefs.security ?? true,
+          newFeature: parsed.data.newFeature ?? true,
+          credits: parsed.data.credits ?? true,
+          system: parsed.data.system ?? false,
+          tips: parsed.data.tips ?? true,
+          security: parsed.data.security ?? true,
         },
-        update: updateData,
+        update: parsed.data,
       });
 
-      // Invalidate notifications cache
       await invalidateNotificationsCache(user.id);
 
       return NextResponse.json({ prefs });
     }
 
-    // Handle notification updates (mark read, archive, snooze, etc.)
-    if (body.notificationId !== undefined && body.action !== undefined) {
+    // Handle notification actions
+    if (body.notificationId !== undefined) {
+      const parsed = notificationActionSchema.safeParse(body);
+      if (!parsed.success) {
+        return validationError(parsed.error.issues);
+      }
+
       const notification = await prisma.notification.findUnique({
-        where: { id: body.notificationId },
+        where: { id: parsed.data.notificationId },
       });
 
       if (!notification || notification.userId !== user.id) {
-        return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+        return notFoundError("Notification");
       }
 
       const updateData: Record<string, unknown> = {};
-      if (body.action === "read") updateData.read = true;
-      if (body.action === "unread") updateData.read = false;
-      if (body.action === "archive") updateData.archived = true;
-      if (body.action === "unarchive") updateData.archived = false;
-      if (body.action === "snooze") {
-        // Snooze for specified duration in minutes (default 60)
-        const duration = body.duration || 60;
+      if (parsed.data.action === "read") updateData.read = true;
+      if (parsed.data.action === "unread") updateData.read = false;
+      if (parsed.data.action === "archive") updateData.archived = true;
+      if (parsed.data.action === "unarchive") updateData.archived = false;
+      if (parsed.data.action === "snooze") {
+        const duration = parsed.data.duration || 60;
         updateData.snoozedUntil = new Date(Date.now() + duration * 60 * 1000);
       }
-      if (body.action === "unsnooze") updateData.snoozedUntil = null;
+      if (parsed.data.action === "unsnooze") updateData.snoozedUntil = null;
 
       const updated = await prisma.notification.update({
-        where: { id: body.notificationId },
+        where: { id: parsed.data.notificationId },
         data: updateData,
       });
 
-      // Invalidate notifications cache
       await invalidateNotificationsCache(user.id);
 
-      // Publish to Redis for real-time SSE subscribers
       await publishNotificationUpdate(user.id, "notification:updated", {
         id: updated.id,
         read: updated.read,
@@ -217,10 +236,10 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return badRequestError("Invalid request");
   } catch (error) {
     console.error("Update notifications error:", error);
-    return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
+    return internalError("Failed to update notifications");
   }
 }
 
@@ -229,9 +248,15 @@ export async function POST(request: NextRequest) {
     const user = await getOrCreateUser(request);
 
     const body = await request.json();
+    const parsed = notificationBulkActionSchema.safeParse(body);
 
-    // Mark all as read
-    if (body.action === "read-all") {
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
+    }
+
+    const action = parsed.data.action;
+
+    if (action === "read-all") {
       await prisma.notification.updateMany({
         where: { userId: user.id, read: false, archived: false },
         data: { read: true },
@@ -241,8 +266,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // Archive all read
-    if (body.action === "archive-read") {
+    if (action === "archive-read") {
       await prisma.notification.updateMany({
         where: { userId: user.id, read: true, archived: false },
         data: { archived: true },
@@ -252,8 +276,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // Archive all
-    if (body.action === "archive-all") {
+    if (action === "archive-all") {
       await prisma.notification.updateMany({
         where: { userId: user.id, archived: false },
         data: { archived: true },
@@ -263,8 +286,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // Unarchive all
-    if (body.action === "unarchive-all") {
+    if (action === "unarchive-all") {
       await prisma.notification.updateMany({
         where: { userId: user.id, archived: true },
         data: { archived: false },
@@ -274,10 +296,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return badRequestError("Invalid action");
   } catch (error) {
     console.error("Notifications action error:", error);
-    return NextResponse.json({ error: "Failed to perform action" }, { status: 500 });
+    return internalError("Failed to perform action");
   }
 }
 

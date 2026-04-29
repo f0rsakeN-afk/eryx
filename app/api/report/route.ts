@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
 import { rateLimit, rateLimitResponse } from "@/services/rate-limit.service";
+import { notFoundError, internalError, validationError } from "@/lib/api-response";
+import { createReportSchema } from "@/lib/validations/api.validation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,14 +37,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { reason, description } = body;
+    const parsed = createReportSchema.safeParse(body);
 
-    if (!reason || !description) {
-      return NextResponse.json(
-        { error: "Reason and description are required." },
-        { status: 400 }
-      );
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
     }
+
+    const { reason, description } = parsed.data;
 
     // Create report linked to user
     const report = await prisma.report.create({
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         reason,
         description,
         email: user.primaryEmail || "",
-        image: body.image || "",
+        image: parsed.data.image || "",
       },
     });
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import promptsData from "@/data/prompts.json";
 import { trackPromptUsage } from "@/services/trending.service";
 import { logger } from "@/lib/logger";
+import { internalError, validationError } from "@/lib/api-response";
+import { suggestQuerySchema } from "@/lib/validations/api.validation";
 
 type TrieNode = {
   isEnd?: true;
@@ -161,13 +163,14 @@ buildIndexes();
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get("q") || "";
+    const queryParams = Object.fromEntries(searchParams);
+    const parsed = suggestQuerySchema.safeParse(queryParams);
 
-    if (query.length < 2) {
-      return NextResponse.json({ suggestions: [] });
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
     }
 
-    const q = query.toLowerCase().trim();
+    const q = parsed.data.q.toLowerCase().trim();
 
     // Check pre-warmed cache first (instant)
     const preWarmed = preWarmedCache.get(q);
