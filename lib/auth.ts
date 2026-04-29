@@ -181,3 +181,15 @@ export async function validateAuth(request: Request): Promise<AuthenticatedUser 
 export async function getUserFromHeaders(request: Request): Promise<AuthenticatedUser | null> {
   return validateAuth(request);
 }
+
+/**
+ * Check if user has admin or moderator role
+ * Use after validateAuth() or getOrCreateUser()
+ */
+export async function isAdminOrModerator(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  return user?.role === "ADMIN" || user?.role === "MODERATOR";
+}
