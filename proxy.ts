@@ -11,7 +11,7 @@ import { validateCSRF, csrfErrorResponse } from "@/lib/csrf";
 import { routing } from "./routing";
 
 const PUBLIC_PATHS = ["/", "/home", "/apps", "/about", "/contact", "/status", "/changelog", "/onboarding"];
-const PUBLIC_API_PATHS = ["/api/auth", "/api/init-user", "/api/models", "/api/mcp", "/api/polar/plans"];
+const PUBLIC_API_PATHS = ["/api/auth", "/api/init-user", "/api/models", "/api/mcp", "/api/polar/plans", "/api/changelog"];
 const ADMIN_PATHS = ["/admin"];
 const ADMIN_API_PREFIX = "/api/admin";
 

@@ -11,12 +11,18 @@ import prisma from "@/lib/prisma";
 import { updateCustomizeSchema } from "@/schemas/validation";
 import { getUserPreferences, invalidateUserPreferencesCache } from "@/services/preferences.service";
 import { invalidateAccountCache } from "@/services/account.service";
+import {
+  unauthorizedError,
+  notFoundError,
+  internalError,
+  validationError,
+} from "@/lib/api-response";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await stackServerApp.getUser({ tokenStore: request });
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     // Get prisma user by stackId to get the numeric id
@@ -26,7 +32,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!prismaUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFoundError("User");
     }
 
     // Use cached preferences
@@ -40,7 +46,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Get customize error:", error);
-    return NextResponse.json({ error: "Failed to get preferences" }, { status: 500 });
+    return internalError("Failed to get preferences");
   }
 }
 
@@ -48,7 +54,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const user = await stackServerApp.getUser({ tokenStore: request });
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     // Get prisma user by stackId to get the numeric id
@@ -58,17 +64,14 @@ export async function PATCH(request: NextRequest) {
     });
 
     if (!prismaUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFoundError("User");
     }
 
     const body = await request.json();
     const parsed = updateCustomizeSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
-        { status: 400 }
-      );
+      return validationError(parsed.error.issues);
     }
 
     const { preferredName, responseTone, detailLevel, interests } = parsed.data;
@@ -116,6 +119,6 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error) {
     console.error("Update customize error:", error);
-    return NextResponse.json({ error: "Failed to update preferences" }, { status: 500 });
+    return internalError("Failed to update preferences");
   }
 }

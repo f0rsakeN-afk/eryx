@@ -12,13 +12,19 @@ import { updateAccountSchema } from "@/schemas/validation";
 import { getAccountData, invalidateAccountCache } from "@/services/account.service";
 import { invalidateUserPreferencesCache } from "@/services/preferences.service";
 import { invalidateUserLimitsCache } from "@/services/limit.service";
+import {
+  unauthorizedError,
+  notFoundError,
+  internalError,
+  validationError,
+} from "@/lib/api-response";
 
 export async function GET(request: NextRequest) {
   try {
     // Use validateAuth which checks proxy-set headers first (fast path)
     const user = await validateAuth(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     // Use cached account data
@@ -29,7 +35,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Get account error:", error);
-    return NextResponse.json({ error: "Failed to get account" }, { status: 500 });
+    return internalError("Failed to get account");
   }
 }
 
@@ -46,17 +52,14 @@ export async function PATCH(request: NextRequest) {
     });
 
     if (!fullUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFoundError("User");
     }
 
     const body = await request.json();
     const parsed = updateAccountSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
-        { status: 400 }
-      );
+      return validationError(parsed.error.issues);
     }
 
     const data = parsed.data;
@@ -144,7 +147,7 @@ export async function DELETE(request: NextRequest) {
     });
 
     if (!fullUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFoundError("User");
     }
 
     // Soft delete - set isActive to false
@@ -160,6 +163,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true, message: "Account deactivated" });
   } catch (error) {
     console.error("Delete account error:", error);
-    return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
+    return internalError("Failed to deactivate account");
   }
 }

@@ -9,6 +9,12 @@ import prisma from "@/lib/prisma";
 import { updateSettingsSchema } from "@/schemas/validation";
 import { getUserSettings, invalidateUserSettingsCache } from "@/services/settings.service";
 import { checkApiRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import {
+  unauthorizedError,
+  notFoundError,
+  internalError,
+  validationError,
+} from "@/lib/api-response";
 
 const DEFAULT_SETTINGS = {
   theme: "system",
@@ -40,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     const user = await stackServerApp.getUser({ tokenStore: request });
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     // Look up prisma user to get internal UUID
@@ -50,7 +56,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!prismaUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFoundError("User");
     }
 
     // Use cached settings (falls back to defaults if no record)
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Get settings error:", error);
-    return NextResponse.json({ error: "Failed to get settings" }, { status: 500 });
+    return internalError("Failed to get settings");
   }
 }
 
@@ -67,17 +73,14 @@ export async function PATCH(request: NextRequest) {
   try {
     const user = await stackServerApp.getUser({ tokenStore: request });
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const body = await request.json();
     const parsed = updateSettingsSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
-        { status: 400 }
-      );
+      return validationError(parsed.error.issues);
     }
 
     const data = parsed.data;
@@ -89,7 +92,7 @@ export async function PATCH(request: NextRequest) {
     });
 
     if (!prismaUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFoundError("User");
     }
 
     // Check if settings already exist
@@ -156,6 +159,6 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error) {
     console.error("Update settings error:", error);
-    return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });
+    return internalError("Failed to update settings");
   }
 }

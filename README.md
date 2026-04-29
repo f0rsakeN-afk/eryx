@@ -97,17 +97,6 @@ Usage-based credits with partial refunds for interrupted streams. Plan tiers wit
 
 ## Documentation
 
-- [Authentication](docs/01-authentication.md)
-- [Middleware & Security](docs/02-middleware-security.md)
-- [Redis Patterns](docs/03-redis.md)
-- [Payments & Billing](docs/04-payments.md)
-- [AI System](docs/05-ai-system.md)
-- [Web Search](docs/06-web-search.md)
-- [Database Schema](docs/07-database.md)
-- [Services Architecture](docs/08-services.md)
-- [API Routes](docs/09-api-routes.md)
-- [Optimizations](docs/10-optimizations.md)
-- [Real-Time Sync](docs/11-realtime-sync.md)
-- [i18n](docs/12-i18n.md)
-- [Resumable Streaming](docs/13-resumable-stream.md)
-- [MCP Apps](docs/14-mcp-apps.md)
+- [Architecture](docs/ARCHITECTURE.md) - System overview, directory structure, data flow
+- [Services](docs/SERVICES.md) - Business logic layer, patterns, conventions
+- [TODO & Improvements](docs/TODO.md) - Planned features, technical debt, monitoring

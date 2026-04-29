@@ -6,16 +6,28 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { stackServerApp } from "@/src/stack/server";
 import prisma from "@/lib/prisma";
 import { routing, type Locale } from "@/routing";
 import { invalidateUserSettingsCache } from "@/services/settings.service";
+import {
+  unauthorizedError,
+  notFoundError,
+  badRequestError,
+  internalError,
+  validationError,
+} from "@/lib/api-response";
+
+const updateLocaleSchema = z.object({
+  language: z.string().min(2).max(10),
+});
 
 export async function PATCH(request: NextRequest) {
   try {
     const user = await stackServerApp.getUser({ tokenStore: request });
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     // Get prisma user by stackId to get the numeric id
@@ -25,18 +37,21 @@ export async function PATCH(request: NextRequest) {
     });
 
     if (!prismaUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return notFoundError("User");
     }
 
     const body = await request.json();
-    const { language } = body;
+    const parsed = updateLocaleSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return validationError(parsed.error.issues);
+    }
+
+    const { language } = parsed.data;
 
     // Validate locale
-    if (!language || !routing.locales.includes(language as Locale)) {
-      return NextResponse.json(
-        { error: "Invalid locale" },
-        { status: 400 }
-      );
+    if (!routing.locales.includes(language as Locale)) {
+      return badRequestError("Invalid locale");
     }
 
     // Update or create settings with language
@@ -57,9 +72,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, language });
   } catch (error) {
     console.error("[Settings/Locale] Error:", error);
-    return NextResponse.json(
-      { error: "Failed to update language" },
-      { status: 500 }
-    );
+    return internalError("Failed to update language");
   }
 }
