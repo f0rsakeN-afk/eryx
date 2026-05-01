@@ -9,6 +9,14 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -21,8 +29,11 @@ import { useUser } from "@stackframe/stack";
 import dynamic from "next/dynamic";
 
 const AuthDialog = dynamic(
-  () => import("@/components/main/sidebar/dialogs/auth/auth-dialog").then((mod) => mod.AuthDialog),
-  { ssr: false }
+  () =>
+    import("@/components/main/sidebar/dialogs/auth/auth-dialog").then(
+      (mod) => mod.AuthDialog,
+    ),
+  { ssr: false },
 );
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -75,10 +86,42 @@ export function MarketingHeader() {
   const NAV_LINKS = [
     { label: "About", href: "/about" },
     { label: t("changelog"), href: "/changelog" },
-    { label: "Pricing", href: "/about#pricing" },
     { label: t("status"), href: "/status" },
     { label: t("contact"), href: "/contact" },
   ] as const;
+
+  const FEATURE_ITEMS = [
+    {
+      title: "Integrations",
+      description: "Connect 50+ tools via MCP",
+      href: "/integrations",
+    },
+    {
+      title: "Web Search",
+      description: "Real-time RAG-powered search with citations",
+      href: "/features/web-search",
+    },
+    {
+      title: "How It Works",
+      description: "Understand the architecture behind Eryx",
+      href: "/features/how-it-works",
+    },
+    {
+      title: "Resumable Stream",
+      description: "Never lose your place in conversations",
+      href: "/features/resumable-stream",
+    },
+    {
+      title: "Memory",
+      description: "Long-term context across conversations",
+      href: "/features/memory",
+    },
+    {
+      title: "Chat Branches",
+      description: "Explore multiple directions in one conversation",
+      href: "/features/chat-branches",
+    },
+  ];
 
   return (
     <>
@@ -88,6 +131,29 @@ export function MarketingHeader() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6">
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger>Features</NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <div className="grid grid-cols-2 gap-3 p-4 w-[420px]">
+                      {FEATURE_ITEMS.map((item) => (
+                        <NavigationMenuLink key={item.href} href={item.href}>
+                          <div className="p-3 rounded-lg hover:bg-muted transition-colors">
+                            <p className="text-sm font-medium text-foreground">
+                              {item.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {item.description}
+                            </p>
+                          </div>
+                        </NavigationMenuLink>
+                      ))}
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
             {NAV_LINKS.map((item) => (
               <NavLink
                 key={item.href}

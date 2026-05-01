@@ -13,6 +13,7 @@ const RATE_LIMIT_MAX = 100; // 100 requests per window
 interface RateLimitConfig {
   windowMs: number;
   maxRequests: number;
+  maxCap?: number; // Absolute cap regardless of tier multiplier
 }
 
 const RATE_LIMITS: Record<string, RateLimitConfig> = {
@@ -20,7 +21,7 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   auth: { windowMs: 300000, maxRequests: 10 }, // 10 attempts per 5 min for auth
   chat: { windowMs: 60000, maxRequests: 60 }, // 60 chat messages per min
   search: { windowMs: 60000, maxRequests: 30 }, // 30 searches per min
-  upload: { windowMs: 60000, maxRequests: 20 }, // 20 uploads per min
+  upload: { windowMs: 60000, maxRequests: 10, maxCap: 20 }, // 10/min base, max 20 even with multiplier
   export: { windowMs: 3600000, maxRequests: 3 }, // 3 exports per hour
 };
 
