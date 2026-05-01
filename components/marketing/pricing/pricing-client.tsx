@@ -272,7 +272,8 @@ export function PricingClient({ data }: { data: PlansData }) {
     }
   };
 
-  const plans = Object.entries(data.plans).filter(([key]) => key !== "enterprise") as [string, Plan][];
+  const plans = Object.entries(data.plans)
+    .filter(([key]) => key !== "free") as [string, Plan][];
 
   return (
     <>
@@ -301,7 +302,7 @@ export function PricingClient({ data }: { data: PlansData }) {
             lightColors="#e5e5e5,#d4d4d4,#c4c4c4,#b5b5b5"
             className="rounded-3xl border border-border/50 bg-muted/20 p-6 md:p-8"
           >
-            <div className="grid md:grid-cols-[1fr_1.15fr_1fr] gap-6 items-stretch">
+            <div className="grid md:grid-cols-3 gap-6 items-stretch">
               {plans.map(([key, plan]) => {
                 let variant: "default" | "featured" | "compact" = "default";
                 if (key === "pro") variant = "featured";

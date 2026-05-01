@@ -46,6 +46,9 @@
   "footer": {
     "startYourFreeTrial": "Start your free trial today",
     "eryxDescription": "Eryx is the all-in-one platform for designing, visualizing, and exploring complex systems with AI-powered insights.",
+    "readyToBuild": "Ready to build?",
+    "welcomeBackDescription": "Your workspace is waiting. Pick up where you left off.",
+    "goToDashboard": "Go to Dashboard",
     "getStarted": "Get Started",
     "product": "Product",
     "aboutUs": "About Us",
@@ -54,7 +57,8 @@
     "contact": "Contact",
     "privacyPolicy": "Privacy Policy",
     "twitter": "Twitter",
-    "linkedin": "LinkedIn"
+    "linkedin": "LinkedIn",
+    "allRightsReserved": "All rights reserved."
   },
   "header": {
     "pricing": "Pricing",
