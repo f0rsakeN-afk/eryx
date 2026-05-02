@@ -109,6 +109,14 @@ function saveToStorage(settings: Settings): void {
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    // Dispatch event for instant ColorSchemeManager update
+    if (settings.colorScheme) {
+      window.dispatchEvent(
+        new CustomEvent("eryx-color-scheme-change", {
+          detail: { colorScheme: settings.colorScheme },
+        })
+      );
+    }
   } catch {
     // localStorage error, ignore
   }

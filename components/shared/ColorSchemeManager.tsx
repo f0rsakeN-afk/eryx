@@ -4,37 +4,37 @@ import * as React from "react";
 
 const COLOR_SCHEMES = ["civic", "studio", "dawn", "dusk", "code", "nebula", "ember", "aura", "pulse", "forge"] as const;
 const STORAGE_KEY = "eryx-settings";
-
-interface StoredSettings {
-  colorScheme?: string;
-  mode?: string;
-}
+const COLOR_SCHEME_EVENT = "eryx-color-scheme-change";
 
 function getStoredColorScheme(): string {
-  if (typeof window === "undefined") return "civic";
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const parsed: StoredSettings = JSON.parse(stored);
-      return parsed.colorScheme || "civic";
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed.colorScheme === "string" && parsed.colorScheme.length > 0) {
+        return parsed.colorScheme;
+      }
     }
   } catch {}
   return "civic";
 }
 
 export function ColorSchemeManager() {
-  const [colorScheme, setColorScheme] = React.useState<string>("civic");
+  const colorScheme = React.useSyncExternalStore(
+    (onStoreChange) => {
+      const handler = () => onStoreChange();
+      window.addEventListener(COLOR_SCHEME_EVENT, handler);
+      return () => window.removeEventListener(COLOR_SCHEME_EVENT, handler);
+    },
+    getStoredColorScheme,
+    () => "civic"
+  );
 
-  // Read from localStorage on mount
-  React.useEffect(() => {
-    setColorScheme(getStoredColorScheme());
-  }, []);
-
-  // Apply to <html> whenever colorScheme changes
   React.useEffect(() => {
     const root = document.documentElement;
-    COLOR_SCHEMES.forEach((scheme) => root.classList.remove(scheme));
-    root.classList.add(colorScheme);
+    const classList = root.classList;
+    COLOR_SCHEMES.forEach((scheme) => classList.remove(scheme));
+    classList.add(colorScheme);
   }, [colorScheme]);
 
   return null;
